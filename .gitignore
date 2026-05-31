@@ -1,0 +1,26 @@
+# Dataset
+Datasets/
+datasets/
+
+# YOLO models
+*.pt
+
+# YOLO output
+runs/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Environment
+.env
+
+# Conda / venv
+venv/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/

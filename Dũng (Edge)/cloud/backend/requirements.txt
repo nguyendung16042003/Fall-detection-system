@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+psycopg2-binary
+sqlalchemy
+pydantic
+paho-mqtt
+python-multipart
+minio
+firebase-admin

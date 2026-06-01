@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "description": "MQTT schema for Edge-to-Cloud fall detection events. All fall_candidate events are verified by VLM before sending app notification.",
+
+  "topics": {
+    "fall_event": "event.cam.{camera_id}.fall.candidate",
+    "telemetry": "telemetry.edge.{edge_device_id}",
+    "status": "status.edge.{edge_device_id}"
+  },
+
+  "fall_event_payload": {
+    "event_id": "evt_20260601_000001",
+    "event_type": "fall_candidate",
+
+    "edge_device_id": "jetson_nano_01",
+    "camera_id": "cam_01",
+    "source_id": 0,
+    "person_id": 3,
+
+    "timestamp": "2026-06-01T10:30:12Z",
+
+    "bbox": {
+      "x1": 120,
+      "y1": 80,
+      "x2": 300,
+      "y2": 420
+    },
+
+    "state_before": "standing",
+    "state_after": "lying",
+    "state_sequence": [
+      "standing",
+      "standing",
+      "sitting",
+      "lying",
+      "lying"
+    ],
+
+    "transition_time_ms": 1200,
+    "time_window_sec": 2.0,
+    "min_lying_frames": 5,
+
+    "classification_confidence": 0.88,
+    "fall_confidence": 0.86,
+    "edge_severity": "high",
+
+    "requires_vlm_verify": true,
+    "notification_policy": "notify_after_vlm_verified",
+
+    "snapshot_path": "edge://cam_01/events/evt_20260601_000001.jpg",
+    "clip_path": "edge://cam_01/events/evt_20260601_000001.mp4",
+
+    "rule_version": "temporal_transition_v1",
+    "created_at": "2026-06-01T10:30:13Z"
+  },
+
+  "telemetry_payload": {
+    "edge_device_id": "jetson_nano_01",
+    "timestamp": "2026-06-01T10:30:12Z",
+    "fps": 12.5,
+    "ram_percent": 72,
+    "temperature_celsius": 68,
+    "camera_status": {
+      "cam_01": "online",
+      "cam_02": "online"
+    },
+    "pipeline_status": "running"
+  }
+}

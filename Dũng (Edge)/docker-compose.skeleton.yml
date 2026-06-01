@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    container_name: fall-mqtt-broker
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./cloud/mosquitto/config:/mosquitto/config
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: fall-postgres
+    environment:
+      POSTGRES_USER: fall_user
+      POSTGRES_PASSWORD: fall_password
+      POSTGRES_DB: fall_detection
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: fall-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: ./cloud/backend
+      dockerfile: Dockerfile
+    container_name: fall-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://fall_user:fall_password@postgres:5432/fall_detection
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: 1883
+      MINIO_ENDPOINT: http://minio:9000
+    depends_on:
+      - postgres
+      - mqtt-broker
+      - minio
+    restart: unless-stopped
+
+  mqtt-consumer:
+    build:
+      context: ./cloud/backend
+      dockerfile: Dockerfile
+    container_name: fall-mqtt-consumer
+    command: python -m app.workers.mqtt_consumer
+    environment:
+      DATABASE_URL: postgresql://fall_user:fall_password@postgres:5432/fall_detection
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: 1883
+    depends_on:
+      - mqtt-broker
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:

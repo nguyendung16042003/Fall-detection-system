@@ -1,5 +1,5 @@
 -- Kích hoạt tiện ích tạo UUID
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; [2]
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";-- [2]
 
 -- 1. BẢNG NGƯỜI DÙNG (USERS)
 CREATE TABLE users (
@@ -54,7 +54,7 @@ CREATE TABLE camera_rules (
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), -- event_id [4, 14]
     camera_id UUID REFERENCES cameras(id) ON DELETE CASCADE,
-    event_type VARCHAR(50) DEFAULT 'fall_candidate', [14, 15]
+    event_type VARCHAR(50) DEFAULT 'fall_candidate',-- [14, 15]
     severity VARCHAR(20) DEFAULT 'low', -- high / low [4, 14]
     person_id INTEGER, -- ID người từ nvtracker [4, 11, 14]
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -90,12 +90,12 @@ CREATE TABLE alerts (
 -- Theo dõi sức khỏe thiết bị Jetson theo API 6.1 & 6.2 [20, 21]
 CREATE TABLE telemetry_logs (
     id BIGSERIAL PRIMARY KEY,
-    edge_device_id VARCHAR(100) NOT NULL, [20]
+    edge_device_id VARCHAR(100) NOT NULL,-- [20]
     pipeline_status VARCHAR(50), -- running / error [20]
-    fps FLOAT, [20, 21]
-    ram_percent FLOAT, [20]
-    cpu_usage FLOAT, [21]
-    gpu_temp FLOAT, [20, 21]
+    fps FLOAT,-- [20, 21]
+    ram_percent FLOAT,-- [20]
+    cpu_usage FLOAT,-- [21]
+    gpu_temp FLOAT,-- [20, 21]
     camera_status_json JSONB, -- {cam_01: online, cam_02: online} [20]
     recorded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -105,14 +105,14 @@ CREATE TABLE telemetry_logs (
 CREATE TABLE confidence_log (
     id SERIAL PRIMARY KEY,
     event_id UUID REFERENCES events(id) ON DELETE CASCADE,
-    model_version VARCHAR(50), [22]
-    inference_latency_ms FLOAT, [22]
-    environment_metadata JSONB, [22]
-    is_flagged_for_retrain BOOLEAN DEFAULT FALSE [22]
+    model_version VARCHAR(50),-- [22]
+    inference_latency_ms FLOAT,-- [22]
+    environment_metadata JSONB,-- [22]
+    is_flagged_for_retrain BOOLEAN DEFAULT FALSE-- [22]
 );
 
 -- CHỈ MỤC (INDEX) TỐI ƯU TRUY VẤN [22]
 CREATE INDEX idx_events_camera_timestamp ON events(camera_id, timestamp DESC);
 CREATE INDEX idx_events_status_severity ON events(status, severity); -- Tối ưu cho API 3.2 [22]
-CREATE INDEX idx_alerts_is_acknowledged ON alerts(is_acknowledged); [22]
+CREATE INDEX idx_alerts_is_acknowledged ON alerts(is_acknowledged);-- [22]
 CREATE INDEX idx_telemetry_device_time ON telemetry_logs(edge_device_id, recorded_at DESC);

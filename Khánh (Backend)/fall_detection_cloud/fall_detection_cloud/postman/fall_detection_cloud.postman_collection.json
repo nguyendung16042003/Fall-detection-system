@@ -1,0 +1,251 @@
+{
+  "info": {
+    "name": "Fall Detection Cloud API",
+    "description": "Bộ sưu tập request mẫu cho Auth, Users, Cameras và Rules. Dùng cho team Mobile (Tấn Dũng) tích hợp.\n\nCách dùng:\n1. Đặt biến `base_url` (mặc định http://localhost:8000).\n2. Chạy `Auth / Login` (tài khoản seed: admin@example.com / admin123). Script tự lưu access_token & refresh_token vào biến collection.\n3. Các request được bảo vệ tự dùng `{{access_token}}` qua Bearer auth.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "camera_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Root",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] }
+          }
+        },
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"secret123\",\n  \"full_name\": \"Người dùng mới\",\n  \"role\": \"caregiver\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', data.refresh_token);",
+                  "}",
+                  "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.access_token) {",
+                  "  pm.collectionVariables.set('access_token', data.access_token);",
+                  "  pm.collectionVariables.set('refresh_token', data.refresh_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/auth/refresh", "host": ["{{base_url}}"], "path": ["api", "v1", "auth", "refresh"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/users/me", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "me"] }
+          }
+        },
+        {
+          "name": "Update me",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Tên mới\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/me", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "me"] }
+          }
+        },
+        {
+          "name": "Upsert FCM token",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"android_device_001\",\n  \"fcm_token\": \"fcm_token_abc...\",\n  \"platform\": \"android\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/me/fcm-token", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "me", "fcm-token"] }
+          }
+        },
+        {
+          "name": "List my devices",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/users/me/devices", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "me", "devices"] }
+          }
+        },
+        {
+          "name": "Delete a device",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/v1/users/me/devices/android_device_001", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "me", "devices", "android_device_001"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cameras",
+      "item": [
+        {
+          "name": "List cameras",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/cameras", "host": ["{{base_url}}"], "path": ["api", "v1", "cameras"] }
+          }
+        },
+        {
+          "name": "Create camera",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('camera_id', data.id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camera Phòng Khách\",\n  \"rtsp_url\": \"rtsp://admin:pass@192.168.1.100:554/stream\",\n  \"edge_device_id\": \"jetson_nano_01\",\n  \"location_note\": \"Phòng khách tầng 1\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/cameras", "host": ["{{base_url}}"], "path": ["api", "v1", "cameras"] }
+          }
+        },
+        {
+          "name": "Get camera by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "cameras", "{{camera_id}}"] }
+          }
+        },
+        {
+          "name": "Update camera",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Living Room Camera\",\n  \"rtsp_url\": \"rtsp://admin:pass@192.168.1.100:554/stream\",\n  \"enabled\": true\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "cameras", "{{camera_id}}"] }
+          }
+        },
+        {
+          "name": "Delete camera",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "cameras", "{{camera_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rules",
+      "item": [
+        {
+          "name": "Get camera rule",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/rules/{{camera_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "{{camera_id}}"] }
+          }
+        },
+        {
+          "name": "Upsert camera rule",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"time_window_sec\": 2,\n  \"min_lying_frames\": 5,\n  \"high_confidence_threshold\": 0.85,\n  \"low_confidence_threshold\": 0.4,\n  \"enable_vlm_verify\": true,\n  \"enabled\": true\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/v1/rules/{{camera_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rules", "{{camera_id}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}

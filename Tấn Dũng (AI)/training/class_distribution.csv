@@ -1,0 +1,13 @@
+Split,Class,Images
+train,bend,800
+train,exercise,2346
+train,lie,2199
+train,sit,4870
+train,stand,7299
+train,unknown,144
+val,bend,89
+val,exercise,261
+val,lie,245
+val,sit,542
+val,stand,812
+val,unknown,16

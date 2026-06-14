@@ -3,7 +3,7 @@ Datasets/
 datasets/
 
 # YOLO models
-*.pt
+#*.pt
 
 # YOLO output
 #runs/

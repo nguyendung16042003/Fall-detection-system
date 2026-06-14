@@ -5,7 +5,8 @@ datasets/
 # YOLO models
 *.pt
 
-
+# YOLO output
+#runs/
 
 # Python cache
 __pycache__/

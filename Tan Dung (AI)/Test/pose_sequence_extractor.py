@@ -7,10 +7,10 @@ from pathlib import Path
 # CONFIG
 # =========================
 
-MODEL_PATH = r"YOUR_BEST_PT"
+MODEL_PATH = r"D:\DOWLOAD\FileTaiLieuHocTapCuaDung\Ki9\Đồ án\Fall-detection-system\Fall-detection-system\Tan Dung (AI)\runs\classify\runs\classify\clsv2_1-14\weights\best.pt"
 
-MCFD_PATH = r"YOUR_MCFD"
-URFD_PATH = r"YOUR_URFD"
+MCFD_PATH = r"D:\DOWLOAD\FileTaiLieuHocTapCuaDung\Ki9\Đồ án\Fall-detection-system\Fall-detection-system\Tan Dung (AI)\Datasets\File Test 2\MCFD"
+URFD_PATH = r"D:\DOWLOAD\FileTaiLieuHocTapCuaDung\Ki9\Đồ án\Fall-detection-system\Fall-detection-system\Tan Dung (AI)\Datasets\File Test 2\URFD"
 
 OUTPUT_CSV = "pose_sequences.csv"
 

@@ -400,12 +400,3 @@ Không cần auth.
 | `INTERNAL_ERROR` | 500 | Lỗi server |
 
 ---
-
-## 11. HANDOFF CHECKLIST
-
-| Ai cần | Cần gì | Từ ai | Deadline |
-|---|---|---|---|
-| Dũng (Jetson) | IP public + port 1883 + user/pass broker | Khánh | T3 ngày 4 |
-| Duy (Flutter) | Postman collection + swagger URL | Khánh | T3 ngày 4 |
-| Khánh (Consumer) | `mqtt_schema.json` | Dũng | T3 ngày 3 ✅ |
-| Duy (FCM) | FCM payload format + Alert API docs | Khánh | T4 giữa tuần |

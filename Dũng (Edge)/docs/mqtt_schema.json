@@ -1,69 +1,131 @@
 {
-  "version": "1.0",
-  "description": "MQTT schema for Edge-to-Cloud fall detection events. All fall_candidate events are verified by VLM before sending app notification.",
-
-  "topics": {
-    "fall_event": "event.cam.{camera_id}.fall.candidate",
-    "telemetry": "telemetry.edge.{edge_device_id}",
-    "status": "status.edge.{edge_device_id}"
+  "_meta": {
+    "version": "1.1",
+    "project": "Fall Detection System — Edge-Cloud",
+    "updated": "2026-06-17",
+    "broker": "RabbitMQ + MQTT Plugin (port 1883, máy Khánh)",
+    "note": "Tất cả fall event đều qua VLM verify — KHÔNG có confidence routing trong production"
   },
 
-  "fall_event_payload": {
-    "event_id": "evt_20260601_000001",
+  "_topics": {
+    "fall_event": "events/cam_{cam_id}/fall",
+    "telemetry":  "telemetry/cam_{cam_id}/status",
+    "examples": [
+      "events/cam_01/fall",
+      "events/cam_02/fall",
+      "telemetry/cam_01/status",
+      "telemetry/cam_02/status"
+    ]
+  },
+
+  "fall_event": {
+    "_comment": "Jetson publish lên topic events/cam_{cam_id}/fall khi Temporal Detector kích hoạt",
+
+    "schema_version": "1.1",
+    "event_id": "<uuid-v4 — tạo bằng Python uuid.uuid4()>",
+    "cam_id": "cam_01",
+    "person_id": 3,
+    "timestamp_utc": "2026-06-15T10:30:00.123Z",
     "event_type": "fall_candidate",
 
-    "edge_device_id": "jetson_nano_01",
-    "camera_id": "cam_01",
-    "source_id": 0,
-    "person_id": 3,
-
-    "timestamp": "2026-06-01T10:30:12Z",
-
-    "bbox": {
-      "x1": 120,
-      "y1": 80,
-      "x2": 300,
-      "y2": 420
+    "detection": {
+      "class_before": "standing",
+      "final_class": "lying",
+      "confidence": 0.92,
+      "bbox_xyxy": [120, 80, 380, 420],
+      "frame_width": 1280,
+      "frame_height": 720
     },
 
-    "state_before": "standing",
-    "state_after": "lying",
-    "state_sequence": [
-      "standing",
-      "standing",
-      "sitting",
-      "lying",
-      "lying"
+    "_detection_notes": {
+      "class_before": "class của person TRƯỚC khi ngã — enum: [standing, sitting]",
+      "final_class": "class tại thời điểm trigger — enum: [standing, sitting, lying, bending, other]",
+      "confidence": "confidence của SGIE (YOLOv8-cls) cho final_class",
+      "bbox_xyxy": "bounding box của person tại frame trigger [x1, y1, x2, y2] pixel"
+    },
+
+    "rule": {
+      "version": "1.0",
+      "trigger": "standing_to_lying",
+      "transition_ms": 1800,
+      "window_ms": 2000
+    },
+
+    "_rule_notes": {
+      "trigger_enum": ["standing_to_lying", "sitting_to_lying"],
+      "transition_ms": "thời gian thực tế từ class_before → lying (đo bằng timestamp frame)",
+      "window_ms": "cửa sổ tối đa cho phép transition — lấy từ GET /api/config/rules"
+    },
+
+    "_frame_delivery_decision": {
+      "status": "CẦN THỐNG NHẤT VỚI KHÁNH trước tuần 5",
+      "option_A": "base64 inline trong payload — đơn giản hơn, payload ~300-600KB",
+      "option_B": "upload MinIO trước rồi gửi URL — payload nhẹ hơn nhưng phức tạp hơn",
+      "default": "Dùng option_A (base64) cho đến khi thống nhất khác"
+    },
+
+    "frames": [
+      { "offset_ms": -2500, "jpeg_b64": "<base64 JPEG — frame tại t-2.5s>" },
+      { "offset_ms": -2000, "jpeg_b64": "<base64 JPEG — frame tại t-2.0s>" },
+      { "offset_ms": -1500, "jpeg_b64": "<base64 JPEG — frame tại t-1.5s>" },
+      { "offset_ms": -1000, "jpeg_b64": "<base64 JPEG — frame tại t-1.0s>" },
+      { "offset_ms":  -500, "jpeg_b64": "<base64 JPEG — frame tại t-0.5s>" },
+      { "offset_ms":     0, "jpeg_b64": "<base64 JPEG — frame tại t=0 (trigger)>" }
     ],
 
-    "transition_time_ms": 1200,
-    "time_window_sec": 2.0,
-    "min_lying_frames": 5,
-
-    "classification_confidence": 0.88,
-    "fall_confidence": 0.86,
-    "edge_severity": "high",
-
-    "requires_vlm_verify": true,
-    "notification_policy": "notify_after_vlm_verified",
-
-    "snapshot_path": "edge://cam_01/events/evt_20260601_000001.jpg",
-    "clip_path": "edge://cam_01/events/evt_20260601_000001.mp4",
-
-    "rule_version": "temporal_transition_v1",
-    "created_at": "2026-06-01T10:30:13Z"
+    "_frame_notes": [
+      "6 frame, mỗi frame cách nhau 500ms = span 2.5 giây (5 khoảng × 500ms)",
+      "offset_ms âm = trước trigger; offset_ms 0 = frame tại thời điểm phát hiện ngã",
+      "chronological order — offset_ms tăng dần từ -2500 đến 0",
+      "JPEG nén quality=80, crop vùng person + padding 20% xung quanh bbox",
+      "Tổng payload ước tính 300–600 KB sau base64 encode"
+    ]
   },
 
-  "telemetry_payload": {
-    "edge_device_id": "jetson_nano_01",
-    "timestamp": "2026-06-01T10:30:12Z",
-    "fps": 12.5,
-    "ram_percent": 72,
-    "temperature_celsius": 68,
-    "camera_status": {
-      "cam_01": "online",
-      "cam_02": "online"
+  "telemetry": {
+    "_comment": "Jetson publish mỗi 30 giây lên topic telemetry/cam_{cam_id}/status",
+
+    "schema_version": "1.1",
+    "cam_id": "cam_01",
+    "timestamp_utc": "2026-06-15T10:30:00.000Z",
+
+    "pipeline": {
+      "state": "running",
+      "fps_pgie": 15.2,
+      "fps_sgie": 12.8,
+      "active_tracks": 2
     },
-    "pipeline_status": "running"
+
+    "_pipeline_notes": {
+      "state_enum": ["running", "stopped", "error", "starting"],
+      "fps_sgie": "0.0 nếu SGIE chưa được thêm vào pipeline (tuần 3)",
+      "active_tracks": "số người đang được ByteTrack theo dõi tại thời điểm gửi"
+    },
+
+    "system": {
+      "ram_used_mb": 2048,
+      "ram_total_mb": 4096,
+      "cpu_temp_c": 65.3,
+      "gpu_temp_c": 68.1,
+      "cpu_usage_pct": 45.2,
+      "disk_free_gb": 8.4
+    },
+
+    "network": {
+      "mqtt_connected": true,
+      "last_event_sent_utc": "2026-06-15T10:29:45.000Z"
+    }
+  },
+
+  "_validation_rules": {
+    "event_id": "required, uuid-v4 format — VD: a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "cam_id": "required, pattern: cam_[0-9]+ — VD: cam_01, cam_02",
+    "person_id": "required, integer >= 0 — gán bởi ByteTrack, reset khi pipeline restart",
+    "timestamp_utc": "required, ISO 8601 với timezone Z — VD: 2026-06-15T10:30:00.123Z",
+    "detection.class_before": "required, enum: [standing, sitting]",
+    "detection.final_class": "required, enum: [standing, sitting, lying, bending, other]",
+    "detection.confidence": "required, float 0.0–1.0",
+    "rule.trigger": "required, enum: [standing_to_lying, sitting_to_lying]",
+    "frames": "required, array length = 6, offset_ms tăng dần [-2500, -2000, -1500, -1000, -500, 0]"
   }
 }

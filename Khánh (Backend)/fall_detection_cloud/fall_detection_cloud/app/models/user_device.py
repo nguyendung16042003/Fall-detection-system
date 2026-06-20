@@ -1,18 +1,17 @@
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
 class UserDevice(Base):
-    """Lưu FCM Token theo từng thiết bị của người dùng (multi-device)."""
+    """FCM token theo từng thiết bị của người dùng (bảng device_tokens)."""
 
-    __tablename__ = "user_devices"
+    __tablename__ = "device_tokens"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(
-        UUID(as_uuid=True),
+        Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

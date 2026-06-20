@@ -1,5 +1,4 @@
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -7,16 +6,17 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
+    id: int
+    username: str
     email: EmailStr
-    full_name: str | None = None
     role: str
     is_active: bool
     created_at: datetime
 
 
 class UserUpdate(BaseModel):
-    full_name: str | None = None
+    username: str | None = None
+    email: EmailStr | None = None
     role: str | None = None
     is_active: bool | None = None
 
@@ -33,7 +33,7 @@ class DeviceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: UUID
+    user_id: int
     device_id: str
     platform: str | None = None
     fcm_token: str

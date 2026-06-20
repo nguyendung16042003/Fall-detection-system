@@ -4,94 +4,88 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class BBox(BaseModel):
-    x1: int
-    y1: int
-    x2: int
-    y2: int
+class DetectionIn(BaseModel):
+    """detection.* trong mqtt_schema v2 fall_event."""
+
+    class_before: str | None = None
+    final_class: str | None = None
+    confidence: float | None = None
+    bbox_xyxy: list[int] | None = Field(default=None, min_length=4, max_length=4)
+    frame_width: int | None = None
+    frame_height: int | None = None
+
+
+class RuleIn(BaseModel):
+    version: str | None = None
+    trigger: str | None = None
+    transition_ms: int | None = None
+    window_ms: int | None = None
+
+
+class FrameIn(BaseModel):
+    offset_ms: int
+    jpeg_b64: str
 
 
 class EventCreate(BaseModel):
-    """Payload Edge (Jetson) gửi lên qua POST /events.
+    """Payload Edge gửi (POST /events REST fallback) = mqtt_schema fall_event.
 
-    Bám theo api_contract.md mục 3.1. Một số field chỉ phục vụ Edge
-    (schema_version, edge_device_id, source_id, rule_version) được chấp nhận
-    nhưng không lưu DB vì bảng `events` (db.txt) không có cột tương ứng.
+    Edge định danh camera bằng `cam_id` chuỗi (vd cam_01); server tra ra UUID
+    camera. `event_id` (uuid Edge tạo) được dùng làm khóa chính nếu hợp lệ.
     """
 
     model_config = ConfigDict(populate_by_name=True)
 
-    # Định danh / metadata phía Edge (tùy chọn, không bắt buộc lưu)
     schema_version: str | None = None
-    event_id: str | None = Field(
-        default=None, examples=["evt_20260531_000001"]
-    )
-    edge_device_id: str | None = Field(default=None, examples=["jetson_nano_01"])
-    source_id: int | None = None
-    rule_version: str | None = None
-
-    # Dữ liệu sự kiện (lưu vào bảng events)
-    camera_id: UUID = Field(..., description="UUID camera trong DB")
-    event_type: str = Field(default="fall_candidate")
-    # Bí danh theo mô tả task: chấp nhận class_label thay cho event_type
-    class_label: str | None = Field(default=None, exclude=True)
-    severity: str = Field(default="low", examples=["high", "low"])
+    event_id: str | None = None
+    cam_id: str = Field(..., examples=["cam_01"])
     person_id: int | None = None
-    timestamp: datetime
-    bbox: BBox | None = None
-    state_before: str | None = None
-    state_after: str | None = None
-    transition_time_ms: int | None = None
-    classification_confidence: float | None = None
-    fall_confidence: float | None = None
-    # Bí danh theo mô tả task: confidence -> fall_confidence
-    confidence: float | None = Field(default=None, exclude=True)
-    vlm_verdict: str | None = None
-    vlm_confidence: float | None = None
-    snapshot_path: str | None = None
-    clip_path: str | None = None
-    status: str = Field(default="new")
+    timestamp_utc: datetime | None = Field(default=None, alias="timestamp")
+    event_type: str = Field(default="fall_candidate")
+
+    detection: DetectionIn | None = None
+    rule: RuleIn | None = None
+    frames: list[FrameIn] | None = None
+
+    status: str = Field(default="pending")
 
 
 class EventCreateResponse(BaseModel):
-    event_id: str
-    status: str = "received"
-
-
-class EventListItem(BaseModel):
+    id: int
     event_id: UUID
-    camera_id: UUID
-    camera_name: str | None = None
-    timestamp: datetime
-    severity: str
+
+
+class DetectionOut(BaseModel):
+    final_class: str | None = None
+    confidence: float | None = None
+    bbox_xyxy: list[int] | None = None
+
+
+class VLMResultOut(BaseModel):
+    fall: bool
+    confidence: float | None = None
+    reason: str | None = None
+
+
+class EventOut(BaseModel):
+    """Event object đầy đủ (contract v2 mục 3)."""
+
+    id: int
+    event_id: UUID
+    cam_id: str | None = None
+    person_id: int | None = None
+    timestamp_utc: datetime
+    event_type: str
     status: str
-    fall_confidence: float | None = None
+    detection: DetectionOut
+    vlm_result: VLMResultOut | None = None
+    clip_url: str | None = None
     snapshot_url: str | None = None
+    created_at: datetime
 
 
 class EventListResponse(BaseModel):
-    items: list[EventListItem]
-    page: int
-    limit: int
     total: int
-
-
-class EventDetail(BaseModel):
-    event_id: UUID
-    event_type: str
-    severity: str
-    camera_id: UUID
-    camera_name: str | None = None
-    person_id: int | None = None
-    timestamp: datetime
-    bbox: BBox | None = None
-    state_before: str | None = None
-    state_after: str | None = None
-    transition_time_ms: int | None = None
-    classification_confidence: float | None = None
-    fall_confidence: float | None = None
-    vlm_verdict: str | None = None
-    vlm_confidence: float | None = None
-    snapshot_url: str | None = None
-    clip_url: str | None = None
-    status: str
+    page: int
+    page_size: int
+    items: list[EventOut]

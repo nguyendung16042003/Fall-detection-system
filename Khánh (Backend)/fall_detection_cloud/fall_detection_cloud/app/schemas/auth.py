@@ -1,22 +1,33 @@
-from uuid import UUID
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRegister(BaseModel):
-    email: EmailStr
+    """Đăng ký tài khoản (contract v2 mục 1)."""
+
+    username: str = Field(..., min_length=3, max_length=150)
     password: str = Field(..., min_length=6, max_length=128)
-    full_name: str | None = None
+    email: EmailStr
     role: str = "caregiver"
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    """Đăng nhập (contract v2: username + password)."""
+
+    username: str
     password: str
 
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class AccessToken(BaseModel):
+    """Response của /auth/refresh (contract v2)."""
+
+    access_token: str
+    expires_in: int
 
 
 class Token(BaseModel):
@@ -25,19 +36,19 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
-class UserBrief(BaseModel):
-    """Thông tin người dùng rút gọn trả kèm khi đăng nhập (theo API contract)."""
+class LoginResponse(Token):
+    """Response của /auth/login (contract v2)."""
 
+    expires_in: int
+
+
+class RegisterResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
-    name: str | None = Field(default=None, validation_alias="full_name")
+    id: int
+    username: str
     email: EmailStr
-    role: str
-
-
-class LoginResponse(Token):
-    user: UserBrief
+    created_at: datetime
 
 
 class TokenPayload(BaseModel):

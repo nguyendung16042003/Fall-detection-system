@@ -14,8 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Tự động khởi tạo bảng dựa trên file schema v1 bạn đã viết [1]
-      - ./db_schema_v1.sql:/docker-entrypoint-initdb.d/db_schema_v1.sql
+      # Cài đặt MỚI: khởi tạo bằng schema v2 (api_contract_v2)
+      - ./db_schema_v2.sql:/docker-entrypoint-initdb.d/db_schema_v2.sql
 
   # 2. Bộ điều phối tin nhắn RabbitMQ
   rabbitmq:
@@ -23,11 +23,15 @@ services:
     container_name: fall_mq
     restart: always
     ports:
-      - "5672:5672"   # Cổng AMQP cho Edge gửi event [3]
-      - "15672:15672" # Giao diện quản lý Web UI
+      - "5672:5672"   # AMQP
+      - "1883:1883"   # MQTT (Edge publish event/telemetry) - contract v2
+      - "15672:15672" # Web UI
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    volumes:
+      # Bật MQTT plugin (port 1883) cho Edge
+      - ./rabbitmq_enabled_plugins:/etc/rabbitmq/enabled_plugins
 
   # 3. Kho lưu trữ đối tượng MinIO (Bổ sung mới) [1, 2]
   minio:
@@ -56,9 +60,16 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      - MQTT_HOST=rabbitmq
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=${RABBITMQ_USER:-guest}
+      - MQTT_PASSWORD=${RABBITMQ_PASS:-guest}
+      - MQTT_ENABLED=true
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_PUBLIC_URL=http://localhost:9000/fall-events
+      - MEDIAMTX_BASE_URL=http://localhost:8888
     depends_on:
       - db
       - rabbitmq

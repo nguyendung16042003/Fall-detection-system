@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -8,7 +6,7 @@ from app.core.database import get_db
 from app.core.security import ACCESS_TOKEN_TYPE, JWTError, decode_token
 from app.models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 _CREDENTIALS_EXCEPTION = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -34,11 +32,11 @@ def get_current_user(
         raise _CREDENTIALS_EXCEPTION
 
     try:
-        user_uuid = UUID(user_id)
-    except ValueError:
+        user_pk = int(user_id)
+    except (TypeError, ValueError):
         raise _CREDENTIALS_EXCEPTION from None
 
-    user = db.query(User).filter(User.id == user_uuid).first()
+    user = db.query(User).filter(User.id == user_pk).first()
     if user is None:
         raise _CREDENTIALS_EXCEPTION
     return user

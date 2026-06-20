@@ -1,6 +1,13 @@
-import uuid
-
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -12,19 +19,20 @@ class Alert(Base):
 
     __tablename__ = "alerts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # Tham chiếu tới events.event_id (UUID v4 của Edge) — contract v2 alert.event_id
     event_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("events.id", ondelete="CASCADE"),
+        ForeignKey("events.event_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     title = Column(String(255))
     message = Column(Text)
+    fcm_sent = Column(Boolean, default=False, nullable=False)
     is_acknowledged = Column(Boolean, default=False, nullable=False, index=True)
-    acknowledged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    acknowledged_by = Column(Integer, ForeignKey("users.id"))
     acknowledged_at = Column(DateTime(timezone=True))
-    note = Column(Text)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

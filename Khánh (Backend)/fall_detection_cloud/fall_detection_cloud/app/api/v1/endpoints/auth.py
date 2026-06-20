@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
     REFRESH_TOKEN_TYPE,
@@ -13,35 +14,43 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.schemas.auth import (
+    AccessToken,
     LoginResponse,
     RefreshRequest,
-    Token,
-    UserBrief,
+    RegisterResponse,
     UserLogin,
     UserRegister,
 )
-from app.schemas.user import UserRead
 
 router = APIRouter()
+
+_ACCESS_TTL_SEC = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
 
 
 @router.post(
     "/register",
-    response_model=UserRead,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def register(user_in: UserRegister, db: Session = Depends(get_db)) -> User:
-    existing = db.query(User).filter(User.email == user_in.email).first()
+    existing = (
+        db.query(User)
+        .filter(
+            (User.email == user_in.email)
+            | (User.username == user_in.username)
+        )
+        .first()
+    )
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email đã được đăng ký",
+            detail="Username hoặc email đã được đăng ký",
         )
 
     user = User(
+        username=user_in.username,
         email=user_in.email,
         hashed_password=hash_password(user_in.password),
-        full_name=user_in.full_name,
         role=user_in.role,
     )
     db.add(user)
@@ -51,16 +60,16 @@ def register(user_in: UserRegister, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(
-    user_in: UserLogin, db: Session = Depends(get_db)
-) -> LoginResponse:
-    user = db.query(User).filter(User.email == user_in.email).first()
+def login(user_in: UserLogin, db: Session = Depends(get_db)) -> LoginResponse:
+    user = (
+        db.query(User).filter(User.username == user_in.username).first()
+    )
     if not user or not verify_password(
         user_in.password, user.hashed_password
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email hoặc mật khẩu không chính xác",
+            detail="Tên đăng nhập hoặc mật khẩu không chính xác",
         )
     if not user.is_active:
         raise HTTPException(
@@ -71,12 +80,14 @@ def login(
     return LoginResponse(
         access_token=create_access_token(subject),
         refresh_token=create_refresh_token(subject),
-        user=UserBrief.model_validate(user),
+        expires_in=_ACCESS_TTL_SEC,
     )
 
 
-@router.post("/refresh", response_model=Token)
-def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> Token:
+@router.post("/refresh", response_model=AccessToken)
+def refresh(
+    payload: RefreshRequest, db: Session = Depends(get_db)
+) -> AccessToken:
     try:
         data = decode_token(payload.refresh_token)
     except JWTError:
@@ -98,7 +109,7 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)) -> Token:
             detail="Refresh token không hợp lệ",
         )
 
-    return Token(
+    return AccessToken(
         access_token=create_access_token(subject),
-        refresh_token=create_refresh_token(subject),
+        expires_in=_ACCESS_TTL_SEC,
     )

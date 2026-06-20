@@ -1,669 +1,292 @@
 {
- "info": {
-  "name": "Fall Detection Cloud API",
-  "description": "Bộ sưu tập request mẫu cho Auth, Users, Cameras và Rules. Dùng cho team Mobile (Tấn Dũng) tích hợp.\n\nCách dùng:\n1. Đặt biến `base_url` (mặc định http://localhost:8000).\n2. Chạy `Auth / Login` (tài khoản seed: admin@example.com / admin123). Script tự lưu access_token & refresh_token vào biến collection.\n3. Các request được bảo vệ tự dùng `{{access_token}}` qua Bearer auth.",
-  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
- },
- "auth": {
-  "type": "bearer",
-  "bearer": [
-   {
-    "key": "token",
-    "value": "{{access_token}}",
-    "type": "string"
-   }
+  "info": {
+    "name": "Fall Detection Cloud API (v2)",
+    "description": "Bộ sưu tập request theo api_contract_v2. Prefix /api.\n\nCách dùng:\n1. Đặt biến base_url (mặc định http://localhost:8000).\n2. Chạy Auth / Login (seed: admin / admin123). Script tự lưu access_token + refresh_token.\n3. Request bảo vệ dùng {{access_token}} qua Bearer auth.\n4. cam_id mẫu: cam_01, cam_02 (chạy seed.py).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "access_token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "cam_id", "value": "cam_01" },
+    { "key": "event_id", "value": "" },
+    { "key": "alert_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"newuser\",\n  \"password\": \"secret123\",\n  \"email\": \"newuser@example.com\"\n}" },
+            "url": { "raw": "{{base_url}}/api/auth/register", "host": ["{{base_url}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var d = pm.response.json();",
+                  "if (d.access_token) pm.collectionVariables.set('access_token', d.access_token);",
+                  "if (d.refresh_token) pm.collectionVariables.set('refresh_token', d.refresh_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}" },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" },
+            "url": { "raw": "{{base_url}}/api/auth/refresh", "host": ["{{base_url}}"], "path": ["api", "auth", "refresh"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users / Devices",
+      "item": [
+        {
+          "name": "Get me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/users/me", "host": ["{{base_url}}"], "path": ["api", "users", "me"] }
+          }
+        },
+        {
+          "name": "Register FCM token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"device_id\": \"android_device_001\",\n  \"platform\": \"android\",\n  \"fcm_token\": \"fcm_token_abc...\"\n}" },
+            "url": { "raw": "{{base_url}}/api/devices/fcm-token", "host": ["{{base_url}}"], "path": ["api", "devices", "fcm-token"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cameras",
+      "item": [
+        {
+          "name": "List cameras",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/cameras", "host": ["{{base_url}}"], "path": ["api", "cameras"] }
+          }
+        },
+        {
+          "name": "Create camera",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cam_id\": \"cam_03\",\n  \"name\": \"Camera Bếp\",\n  \"rtsp_url\": \"rtsp://admin:pass@192.168.1.102:554/stream1\",\n  \"location\": \"Bếp tầng 1\",\n  \"edge_device_id\": \"jetson_nano_03\",\n  \"is_active\": true\n}" },
+            "url": { "raw": "{{base_url}}/api/cameras", "host": ["{{base_url}}"], "path": ["api", "cameras"] }
+          }
+        },
+        {
+          "name": "Get camera",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/cameras/{{cam_id}}", "host": ["{{base_url}}"], "path": ["api", "cameras", "{{cam_id}}"] }
+          }
+        },
+        {
+          "name": "Update camera",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Camera Phòng Khách (đổi tên)\",\n  \"is_active\": false\n}" },
+            "url": { "raw": "{{base_url}}/api/cameras/{{cam_id}}", "host": ["{{base_url}}"], "path": ["api", "cameras", "{{cam_id}}"] }
+          }
+        },
+        {
+          "name": "Delete camera",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/cameras/{{cam_id}}", "host": ["{{base_url}}"], "path": ["api", "cameras", "{{cam_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Config (rules)",
+      "item": [
+        {
+          "name": "Get rules config",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/config/rules", "host": ["{{base_url}}"], "path": ["api", "config", "rules"] }
+          }
+        },
+        {
+          "name": "Update rules config",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fall_detection\": { \"transition_window_ms\": 2000, \"confirm_frames\": 5, \"min_confidence_sgie\": 0.5 },\n  \"dedup\": { \"window_ms\": 3000 },\n  \"vlm\": { \"enabled\": true },\n  \"notifications\": { \"fcm_enabled\": true, \"cameras\": { \"cam_01\": { \"notify\": true } } }\n}" },
+            "url": { "raw": "{{base_url}}/api/config/rules", "host": ["{{base_url}}"], "path": ["api", "config", "rules"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Events",
+      "item": [
+        {
+          "name": "Create event (REST fallback - mqtt fall_event)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var d = pm.response.json();",
+                  "if (d.id) pm.collectionVariables.set('event_id', d.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"schema_version\": \"2.0\",\n  \"event_id\": \"3b1c8d2e-7f4a-4b9c-9d1e-2a3b4c5d6e7f\",\n  \"cam_id\": \"cam_01\",\n  \"person_id\": 1,\n  \"timestamp\": \"2026-06-20T07:00:00Z\",\n  \"event_type\": \"fall_candidate\",\n  \"detection\": {\n    \"class_before\": \"standing\",\n    \"final_class\": \"lying\",\n    \"confidence\": 0.62,\n    \"bbox_xyxy\": [100, 120, 320, 400],\n    \"frame_width\": 1280,\n    \"frame_height\": 720\n  },\n  \"rule\": { \"trigger\": \"transition\", \"transition_ms\": 800, \"window_ms\": 2000 },\n  \"frames\": [{ \"offset_ms\": 0, \"jpeg_b64\": \"/9j/2Q==\" }]\n}" },
+            "url": { "raw": "{{base_url}}/api/events", "host": ["{{base_url}}"], "path": ["api", "events"] }
+          }
+        },
+        {
+          "name": "List events (filter + pagination)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/events?cam_id=cam_01&status=confirmed&page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "events"],
+              "query": [
+                { "key": "cam_id", "value": "cam_01" },
+                { "key": "status", "value": "confirmed" },
+                { "key": "start_date", "value": "2026-06-01", "disabled": true },
+                { "key": "end_date", "value": "2026-06-30", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get event",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/events/{{event_id}}", "host": ["{{base_url}}"], "path": ["api", "events", "{{event_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "List alerts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var d = pm.response.json();",
+                  "if (d.items && d.items.length) pm.collectionVariables.set('alert_id', d.items[0].id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/alerts?acknowledged=false&page=1&page_size=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "alerts"],
+              "query": [
+                { "key": "cam_id", "value": "cam_01", "disabled": true },
+                { "key": "acknowledged", "value": "false" },
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get alert",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/alerts/{{alert_id}}", "host": ["{{base_url}}"], "path": ["api", "alerts", "{{alert_id}}"] }
+          }
+        },
+        {
+          "name": "Acknowledge alert (empty body)",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{base_url}}/api/alerts/{{alert_id}}/acknowledge", "host": ["{{base_url}}"], "path": ["api", "alerts", "{{alert_id}}", "acknowledge"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Telemetry",
+      "item": [
+        {
+          "name": "Get latest telemetry",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/telemetry/{{cam_id}}/latest", "host": ["{{base_url}}"], "path": ["api", "telemetry", "{{cam_id}}", "latest"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Live",
+      "item": [
+        {
+          "name": "Get live HLS url",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/live/{{cam_id}}", "host": ["{{base_url}}"], "path": ["api", "live", "{{cam_id}}"] }
+          }
+        }
+      ]
+    }
   ]
- },
- "variable": [
-  {
-   "key": "base_url",
-   "value": "http://localhost:8000"
-  },
-  {
-   "key": "access_token",
-   "value": ""
-  },
-  {
-   "key": "refresh_token",
-   "value": ""
-  },
-  {
-   "key": "camera_id",
-   "value": ""
-  },
-  {
-   "key": "event_id",
-   "value": ""
-  }
- ],
- "item": [
-  {
-   "name": "Health",
-   "item": [
-    {
-     "name": "Root",
-     "request": {
-      "auth": {
-       "type": "noauth"
-      },
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        ""
-       ]
-      }
-     }
-    },
-    {
-     "name": "Health check",
-     "request": {
-      "auth": {
-       "type": "noauth"
-      },
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/health",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "health"
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
-   "name": "Auth",
-   "item": [
-    {
-     "name": "Register",
-     "request": {
-      "auth": {
-       "type": "noauth"
-      },
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"secret123\",\n  \"full_name\": \"Người dùng mới\",\n  \"role\": \"caregiver\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/auth/register",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "auth",
-        "register"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Login",
-     "event": [
-      {
-       "listen": "test",
-       "script": {
-        "exec": [
-         "var data = pm.response.json();",
-         "if (data.access_token) {",
-         "  pm.collectionVariables.set('access_token', data.access_token);",
-         "  pm.collectionVariables.set('refresh_token', data.refresh_token);",
-         "}",
-         "pm.test('status 200', function () { pm.response.to.have.status(200); });"
-        ],
-        "type": "text/javascript"
-       }
-      }
-     ],
-     "request": {
-      "auth": {
-       "type": "noauth"
-      },
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/auth/login",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "auth",
-        "login"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Refresh token",
-     "event": [
-      {
-       "listen": "test",
-       "script": {
-        "exec": [
-         "var data = pm.response.json();",
-         "if (data.access_token) {",
-         "  pm.collectionVariables.set('access_token', data.access_token);",
-         "  pm.collectionVariables.set('refresh_token', data.refresh_token);",
-         "}"
-        ],
-        "type": "text/javascript"
-       }
-      }
-     ],
-     "request": {
-      "auth": {
-       "type": "noauth"
-      },
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/auth/refresh",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "auth",
-        "refresh"
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
-   "name": "Users",
-   "item": [
-    {
-     "name": "Get me",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/users/me",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "users",
-        "me"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Update me",
-     "request": {
-      "method": "PUT",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"full_name\": \"Tên mới\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/users/me",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "users",
-        "me"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Upsert FCM token",
-     "request": {
-      "method": "PUT",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"device_id\": \"android_device_001\",\n  \"fcm_token\": \"fcm_token_abc...\",\n  \"platform\": \"android\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/users/me/fcm-token",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "users",
-        "me",
-        "fcm-token"
-       ]
-      }
-     }
-    },
-    {
-     "name": "List my devices",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/users/me/devices",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "users",
-        "me",
-        "devices"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Delete a device",
-     "request": {
-      "method": "DELETE",
-      "url": {
-       "raw": "{{base_url}}/api/v1/users/me/devices/android_device_001",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "users",
-        "me",
-        "devices",
-        "android_device_001"
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
-   "name": "Cameras",
-   "item": [
-    {
-     "name": "List cameras",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/cameras",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "cameras"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Create camera",
-     "event": [
-      {
-       "listen": "test",
-       "script": {
-        "exec": [
-         "var data = pm.response.json();",
-         "if (data.id) { pm.collectionVariables.set('camera_id', data.id); }"
-        ],
-        "type": "text/javascript"
-       }
-      }
-     ],
-     "request": {
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"name\": \"Camera Phòng Khách\",\n  \"rtsp_url\": \"rtsp://admin:pass@192.168.1.100:554/stream\",\n  \"edge_device_id\": \"jetson_nano_01\",\n  \"location_note\": \"Phòng khách tầng 1\"\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/cameras",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "cameras"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Get camera by id",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "cameras",
-        "{{camera_id}}"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Update camera",
-     "request": {
-      "method": "PUT",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"name\": \"Living Room Camera\",\n  \"rtsp_url\": \"rtsp://admin:pass@192.168.1.100:554/stream\",\n  \"enabled\": true\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "cameras",
-        "{{camera_id}}"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Delete camera",
-     "request": {
-      "method": "DELETE",
-      "url": {
-       "raw": "{{base_url}}/api/v1/cameras/{{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "cameras",
-        "{{camera_id}}"
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
-   "name": "Rules",
-   "item": [
-    {
-     "name": "Get camera rule",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/rules/{{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "rules",
-        "{{camera_id}}"
-       ]
-      }
-     }
-    },
-    {
-     "name": "Upsert camera rule",
-     "request": {
-      "method": "PUT",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"time_window_sec\": 2,\n  \"min_lying_frames\": 5,\n  \"high_confidence_threshold\": 0.85,\n  \"low_confidence_threshold\": 0.4,\n  \"enable_vlm_verify\": true,\n  \"enabled\": true\n}"
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/rules/{{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "rules",
-        "{{camera_id}}"
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
-   "name": "Events",
-   "item": [
-    {
-     "name": "Ingest event (Edge -> Cloud)",
-     "event": [
-      {
-       "listen": "test",
-       "script": {
-        "type": "text/javascript",
-        "exec": [
-         "var d = pm.response.json();",
-         "if (d.event_id) { pm.collectionVariables.set('event_id', d.event_id); }",
-         "pm.test('status 201', function () { pm.response.to.have.status(201); });"
-        ]
-       }
-      }
-     ],
-     "request": {
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"schema_version\": \"1.0.0\",\n  \"event_id\": \"evt_20260531_000001\",\n  \"event_type\": \"fall_candidate\",\n  \"severity\": \"high\",\n  \"edge_device_id\": \"jetson_nano_01\",\n  \"camera_id\": \"{{camera_id}}\",\n  \"source_id\": 0,\n  \"person_id\": 3,\n  \"timestamp\": \"2026-06-08T10:30:12Z\",\n  \"bbox\": {\n    \"x1\": 120,\n    \"y1\": 80,\n    \"x2\": 300,\n    \"y2\": 420\n  },\n  \"state_before\": \"standing\",\n  \"state_after\": \"lying\",\n  \"transition_time_ms\": 1200,\n  \"classification_confidence\": 0.88,\n  \"fall_confidence\": 0.86,\n  \"snapshot_path\": \"edge://cam_01/events/evt.jpg\",\n  \"clip_path\": \"edge://cam_01/events/evt.mp4\",\n  \"rule_version\": \"temporal_v1\"\n}",
-       "options": {
-        "raw": {
-         "language": "json"
-        }
-       }
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/events",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "events"
-       ]
-      },
-      "description": "Edge gửi sự kiện ngã. severity=high -> queue fall_events.high, ngược lại fall_events.low. camera_id là UUID camera trong DB."
-     }
-    },
-    {
-     "name": "List events (history + filter + pagination)",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/events?page=1&limit=20&severity=high&camera_id={{camera_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "events"
-       ],
-       "query": [
-        {
-         "key": "page",
-         "value": "1"
-        },
-        {
-         "key": "limit",
-         "value": "20"
-        },
-        {
-         "key": "severity",
-         "value": "high"
-        },
-        {
-         "key": "camera_id",
-         "value": "{{camera_id}}"
-        }
-       ]
-      },
-      "description": "Filter: camera_id, from (ISO), to (ISO), severity (high/low), status (new/acknowledged/resolved). Phân trang: page, limit."
-     }
-    },
-    {
-     "name": "Get event detail",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/events/{{event_id}}",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "events",
-        "{{event_id}}"
-       ]
-      },
-      "description": "Chi tiết 1 sự kiện theo UUID."
-     }
-    }
-   ]
-  },
-  {
-   "name": "Telemetry",
-   "item": [
-    {
-     "name": "Send telemetry (Edge -> Cloud)",
-     "request": {
-      "method": "POST",
-      "header": [
-       {
-        "key": "Content-Type",
-        "value": "application/json"
-       }
-      ],
-      "body": {
-       "mode": "raw",
-       "raw": "{\n  \"schema_version\": \"1.0.0\",\n  \"edge_device_id\": \"jetson_nano_01\",\n  \"timestamp\": \"2026-06-08T10:30:12Z\",\n  \"pipeline_status\": \"running\",\n  \"fps\": 12.5,\n  \"ram_percent\": 72,\n  \"temperature_celsius\": 68,\n  \"camera_status\": {\n    \"cam_01\": \"online\",\n    \"cam_02\": \"online\"\n  }\n}",
-       "options": {
-        "raw": {
-         "language": "json"
-        }
-       }
-      },
-      "url": {
-       "raw": "{{base_url}}/api/v1/telemetry",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "telemetry"
-       ]
-      },
-      "description": "Lưu telemetry + publish queue telemetry_events."
-     }
-    },
-    {
-     "name": "Get edge status",
-     "request": {
-      "method": "GET",
-      "url": {
-       "raw": "{{base_url}}/api/v1/telemetry/jetson_nano_01",
-       "host": [
-        "{{base_url}}"
-       ],
-       "path": [
-        "api",
-        "v1",
-        "telemetry",
-        "jetson_nano_01"
-       ]
-      },
-      "description": "Telemetry mới nhất của 1 edge device."
-     }
-    }
-   ]
-  }
- ]
 }

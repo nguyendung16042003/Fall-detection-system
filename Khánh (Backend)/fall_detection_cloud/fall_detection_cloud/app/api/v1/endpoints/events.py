@@ -1,53 +1,84 @@
-from datetime import datetime
+import logging
+from datetime import date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
-from app.core.database import get_db
-from app.core.messaging import RoutingKey, publish
+from app.core.database import SessionLocal, get_db
 from app.models.camera import Camera
 from app.models.event import Event
 from app.models.user import User
 from app.schemas.event import (
+    DetectionOut,
     EventCreate,
     EventCreateResponse,
-    EventDetail,
-    EventListItem,
     EventListResponse,
+    EventOut,
+    VLMResultOut,
 )
+from app.services.alert_pipeline import run_pipeline
+from app.services.event_ingest import CameraNotFoundError, ingest_event
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-def _routing_key_for(severity: str) -> str:
-    """high -> fall_events.high; còn lại -> fall_events.low."""
-    if (severity or "").lower() == "high":
-        return RoutingKey.FALL_HIGH.value
-    return RoutingKey.FALL_LOW.value
+def _run_pipeline_bg(event_pk: int) -> None:
+    """Chạy trigger chain (VLM -> alert -> FCM/Telegram) ở background."""
+    db = SessionLocal()
+    try:
+        event = db.query(Event).filter(Event.id == event_pk).first()
+        if event is None:
+            return
+        result = run_pipeline(db, event)
+        logger.info("Pipeline %s: %s", event_pk, result)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Pipeline lỗi cho event %s: %s", event_pk, exc)
+    finally:
+        db.close()
 
 
-def _to_detail(event: Event) -> EventDetail:
-    return EventDetail(
-        event_id=event.id,
-        event_type=event.event_type,
-        severity=event.severity,
-        camera_id=event.camera_id,
-        camera_name=event.camera.name if event.camera else None,
+def to_event_out(event: Event) -> EventOut:
+    bbox = event.bbox_json or {}
+    bbox_xyxy = None
+    if all(k in bbox for k in ("x1", "y1", "x2", "y2")):
+        bbox_xyxy = [bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]]
+
+    vlm_result = None
+    if event.vlm_verdict is not None:
+        vlm_result = VLMResultOut(
+            fall=event.vlm_verdict == "fall",
+            confidence=event.vlm_confidence,
+            reason=event.vlm_reason,
+        )
+
+    return EventOut(
+        id=event.id,
+        event_id=event.event_id,
+        cam_id=event.camera.cam_id if event.camera else None,
         person_id=event.person_id,
-        timestamp=event.timestamp,
-        bbox=event.bbox_json,
-        state_before=event.state_before,
-        state_after=event.state_after,
-        transition_time_ms=event.transition_time_ms,
-        classification_confidence=event.classification_confidence,
-        fall_confidence=event.fall_confidence,
-        vlm_verdict=event.vlm_verdict,
-        vlm_confidence=event.vlm_confidence,
-        snapshot_url=event.image_url,
-        clip_url=event.video_clip_url,
+        timestamp_utc=event.timestamp_utc,
+        event_type=event.event_type,
         status=event.status,
+        detection=DetectionOut(
+            final_class=event.final_class,
+            confidence=event.detection_confidence,
+            bbox_xyxy=bbox_xyxy,
+        ),
+        vlm_result=vlm_result,
+        clip_url=event.clip_url,
+        snapshot_url=event.image_url,
+        created_at=event.created_at,
     )
 
 
@@ -56,131 +87,84 @@ def _to_detail(event: Event) -> EventDetail:
     response_model=EventCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def ingest_event(
+def create_event(
     payload: EventCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
 ) -> EventCreateResponse:
-    """Nhận sự kiện ngã từ Edge: lưu DB + publish RabbitMQ theo severity."""
-    camera = db.query(Camera).filter(Camera.id == payload.camera_id).first()
-    if camera is None:
+    """REST fallback nhận sự kiện ngã từ Edge (khi MQTT lỗi / bơm data test)."""
+    if payload.timestamp_utc is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Thiếu timestamp_utc",
+        )
+    try:
+        event, _frame = ingest_event(db, payload)
+    except CameraNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Camera không tồn tại",
-        )
+            detail=f"Camera không tồn tại: {payload.cam_id}",
+        ) from None
 
-    event = Event(
-        camera_id=payload.camera_id,
-        event_type=payload.class_label or payload.event_type,
-        severity=payload.severity,
-        person_id=payload.person_id,
-        timestamp=payload.timestamp,
-        bbox_json=payload.bbox.model_dump() if payload.bbox else None,
-        state_before=payload.state_before,
-        state_after=payload.state_after,
-        transition_time_ms=payload.transition_time_ms,
-        classification_confidence=payload.classification_confidence,
-        fall_confidence=(
-            payload.fall_confidence
-            if payload.fall_confidence is not None
-            else payload.confidence
-        ),
-        vlm_verdict=payload.vlm_verdict,
-        vlm_confidence=payload.vlm_confidence,
-        image_url=payload.snapshot_path,
-        video_clip_url=payload.clip_path,
-        status=payload.status,
-    )
-    db.add(event)
-    db.commit()
-    db.refresh(event)
-
-    # Publish sang RabbitMQ (không chặn nếu broker lỗi)
-    publish(
-        _routing_key_for(event.severity),
-        {
-            "event_id": str(event.id),
-            "edge_event_id": payload.event_id,
-            "camera_id": str(event.camera_id),
-            "edge_device_id": payload.edge_device_id,
-            "event_type": event.event_type,
-            "severity": event.severity,
-            "person_id": event.person_id,
-            "timestamp": event.timestamp,
-            "fall_confidence": event.fall_confidence,
-            "classification_confidence": event.classification_confidence,
-            "bbox": event.bbox_json,
-            "status": event.status,
-        },
-    )
-
-    # Theo contract: echo lại event_id của Edge nếu có, không thì trả UUID server
-    return EventCreateResponse(
-        event_id=payload.event_id or str(event.id), status="received"
-    )
+    # Trigger chain chạy nền: VLM verify -> alert -> FCM/Telegram
+    background_tasks.add_task(_run_pipeline_bg, event.id)
+    return EventCreateResponse(id=event.id, event_id=event.event_id)
 
 
 @router.get("", response_model=EventListResponse)
 def list_events(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
-    camera_id: UUID | None = Query(default=None),
-    from_: datetime | None = Query(default=None, alias="from"),
-    to: datetime | None = Query(default=None),
-    severity: str | None = Query(default=None),
+    cam_id: str | None = Query(default=None),
     status_: str | None = Query(default=None, alias="status"),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
+    page_size: int = Query(default=20, ge=1, le=100),
 ) -> EventListResponse:
-    """Lịch sử sự kiện cho Mobile: phân trang + filter."""
-    query = db.query(Event)
-    if camera_id is not None:
-        query = query.filter(Event.camera_id == camera_id)
-    if from_ is not None:
-        query = query.filter(Event.timestamp >= from_)
-    if to is not None:
-        query = query.filter(Event.timestamp <= to)
-    if severity is not None:
-        query = query.filter(Event.severity == severity)
+    """Lịch sử sự kiện cho Mobile: phân trang + filter (contract v2)."""
+    query = db.query(Event).join(Camera, Event.camera_id == Camera.id)
+    if cam_id is not None:
+        query = query.filter(Camera.cam_id == cam_id)
     if status_ is not None:
         query = query.filter(Event.status == status_)
+    if start_date is not None:
+        query = query.filter(
+            Event.timestamp_utc
+            >= datetime.combine(start_date, datetime.min.time())
+        )
+    if end_date is not None:
+        query = query.filter(
+            Event.timestamp_utc
+            <= datetime.combine(end_date, datetime.max.time())
+        )
 
     total = query.count()
     events = (
-        query.order_by(Event.timestamp.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
+        query.order_by(Event.timestamp_utc.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
-
-    items = [
-        EventListItem(
-            event_id=e.id,
-            camera_id=e.camera_id,
-            camera_name=e.camera.name if e.camera else None,
-            timestamp=e.timestamp,
-            severity=e.severity,
-            status=e.status,
-            fall_confidence=e.fall_confidence,
-            snapshot_url=e.image_url,
-        )
-        for e in events
-    ]
     return EventListResponse(
-        items=items, page=page, limit=limit, total=total
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[to_event_out(e) for e in events],
     )
 
 
-@router.get("/{event_id}", response_model=EventDetail)
+@router.get("/{event_id}", response_model=EventOut)
 def get_event(
     event_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
-) -> EventDetail:
-    event = db.query(Event).filter(Event.id == event_id).first()
+) -> EventOut:
+    event = db.query(Event).filter(Event.event_id == event_id).first()
     if event is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sự kiện không tồn tại",
         )
-    return _to_detail(event)
+    return to_event_out(event)

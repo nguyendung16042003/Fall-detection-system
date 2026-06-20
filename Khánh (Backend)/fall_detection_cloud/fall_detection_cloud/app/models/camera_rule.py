@@ -7,7 +7,6 @@ from sqlalchemy import (
     Integer,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -20,15 +19,14 @@ class CameraRule(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     camera_id = Column(
-        UUID(as_uuid=True),
+        Integer,
         ForeignKey("cameras.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     time_window_sec = Column(Integer, default=2, nullable=False)
     min_lying_frames = Column(Integer, default=5, nullable=False)
-    high_confidence_threshold = Column(Float, default=0.85, nullable=False)
-    low_confidence_threshold = Column(Float, default=0.40, nullable=False)
+    min_confidence_sgie = Column(Float, default=0.6, nullable=False)
     enable_vlm_verify = Column(Boolean, default=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     updated_at = Column(

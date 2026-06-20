@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -28,15 +26,31 @@ def create_camera(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
 ) -> Camera:
-    camera = Camera(**camera_in.model_dump(exclude_none=True))
+    if (
+        db.query(Camera).filter(Camera.cam_id == camera_in.cam_id).first()
+        is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="cam_id đã tồn tại",
+        )
+    camera = Camera(
+        cam_id=camera_in.cam_id,
+        name=camera_in.name,
+        rtsp_url=camera_in.rtsp_url,
+        location=camera_in.location,
+        edge_device_id=camera_in.edge_device_id or "",
+        is_active=camera_in.is_active,
+        status="online" if camera_in.is_active else "offline",
+    )
     db.add(camera)
     db.commit()
     db.refresh(camera)
     return camera
 
 
-def _get_camera_or_404(camera_id: UUID, db: Session) -> Camera:
-    camera = db.query(Camera).filter(Camera.id == camera_id).first()
+def _get_camera_or_404(cam_id: str, db: Session) -> Camera:
+    camera = db.query(Camera).filter(Camera.cam_id == cam_id).first()
     if camera is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -45,28 +59,26 @@ def _get_camera_or_404(camera_id: UUID, db: Session) -> Camera:
     return camera
 
 
-@router.get("/{camera_id}", response_model=CameraRead)
+@router.get("/{cam_id}", response_model=CameraRead)
 def get_camera(
-    camera_id: UUID,
+    cam_id: str,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
 ) -> Camera:
-    return _get_camera_or_404(camera_id, db)
+    return _get_camera_or_404(cam_id, db)
 
 
-@router.put("/{camera_id}", response_model=CameraRead)
+@router.put("/{cam_id}", response_model=CameraRead)
 def update_camera(
-    camera_id: UUID,
+    cam_id: str,
     camera_in: CameraUpdate,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
 ) -> Camera:
-    camera = _get_camera_or_404(camera_id, db)
+    camera = _get_camera_or_404(cam_id, db)
     payload = camera_in.model_dump(exclude_unset=True)
-    # contract dùng `enabled`; ánh xạ sang cột `status`
-    enabled = payload.pop("enabled", None)
-    if enabled is not None and "status" not in payload:
-        payload["status"] = "online" if enabled else "offline"
+    if "is_active" in payload:
+        camera.status = "online" if payload["is_active"] else "offline"
     for key, value in payload.items():
         setattr(camera, key, value)
     db.commit()
@@ -74,12 +86,12 @@ def update_camera(
     return camera
 
 
-@router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{cam_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_camera(
-    camera_id: UUID,
+    cam_id: str,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_active_user),
 ) -> None:
-    camera = _get_camera_or_404(camera_id, db)
+    camera = _get_camera_or_404(cam_id, db)
     db.delete(camera)
     db.commit()

@@ -36,8 +36,8 @@ def _handle_fall(payload: dict, cam_id: str | None) -> None:
     data = EventCreate.model_validate(payload)
     db = SessionLocal()
     try:
-        event, frame = ingest_event(db, data)
-        result = run_pipeline(db, event, image_bytes=frame)
+        event, frame, all_frames = ingest_event(db, data)
+        result = run_pipeline(db, event, image_bytes=frame, frames_bytes=all_frames)
         logger.info("MQTT fall %s -> %s", event.id, result)
     except CameraNotFoundError as exc:
         logger.warning("MQTT fall: camera không tồn tại cam_id=%s", exc)

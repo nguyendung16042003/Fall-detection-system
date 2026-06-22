@@ -37,10 +37,32 @@ def _decode_trigger_frame(data: EventCreate) -> bytes | None:
         return None
 
 
+def _decode_all_frames(data: EventCreate) -> list[bytes] | None:
+    """Giải mã tất cả 6 frame từ payload cho VLM temporal analysis."""
+    if not data.frames or len(data.frames) != 6:
+        logger.warning("Cần đúng 6 frame cho VLM, nhận được %d", len(data.frames) if data.frames else 0)
+        return None
+    
+    frames = []
+    for frame in sorted(data.frames, key=lambda f: f.offset_ms):
+        try:
+            frame_bytes = base64.b64decode(frame.jpeg_b64)
+            frames.append(frame_bytes)
+        except (binascii.Error, ValueError) as exc:
+            logger.warning("Frame base64 không hợp lệ tại offset_ms=%d: %s", frame.offset_ms, exc)
+            return None
+    
+    if len(frames) != 6:
+        logger.warning("Giải mã được %d/6 frame", len(frames))
+        return None
+    
+    return frames
+
+
 def ingest_event(
     db: Session, data: EventCreate
-) -> tuple[Event, bytes | None]:
-    """Lưu một sự kiện ngã, trả về (Event, bytes frame trigger nếu có)."""
+) -> tuple[Event, bytes | None, list[bytes] | None]:
+    """Lưu một sự kiện ngã, trả về (Event, bytes frame trigger, list 6 frames)."""
     camera = db.query(Camera).filter(Camera.cam_id == data.cam_id).first()
     if camera is None:
         raise CameraNotFoundError(data.cam_id)
@@ -60,6 +82,7 @@ def ingest_event(
         bbox_json = {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
     frame_bytes = _decode_trigger_frame(data)
+    all_frames = _decode_all_frames(data)
     image_url = upload_jpeg(frame_bytes) if frame_bytes else None
 
     event = Event(
@@ -82,4 +105,4 @@ def ingest_event(
     db.add(event)
     db.commit()
     db.refresh(event)
-    return event, frame_bytes
+    return event, frame_bytes, all_frames

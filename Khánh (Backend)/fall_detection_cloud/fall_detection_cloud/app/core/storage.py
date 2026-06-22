@@ -78,3 +78,40 @@ def upload_jpeg(data: bytes, key_prefix: str = "snapshots") -> str | None:
         f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}"
     )
     return f"{base.rstrip('/')}/{name}"
+
+
+def upload_clip(frames: list[bytes], key_prefix: str = "clips") -> str | None:
+    """Upload chuỗi frame JPEG như clip cho MLOps, trả về URL công khai."""
+    client = _get_client()
+    if client is None or not frames:
+        return None
+    
+    # Tạo ZIP file chứa 6 frames
+    import io
+    import zipfile
+    
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for i, frame in enumerate(frames):
+            zip_file.writestr(f"frame_{i:03d}.jpg", frame)
+    
+    zip_data = zip_buffer.getvalue()
+    name = f"{key_prefix}/{uuid.uuid4().hex}.zip"
+    
+    try:
+        client.put_object(
+            settings.MINIO_BUCKET,
+            name,
+            io.BytesIO(zip_data),
+            length=len(zip_data),
+            content_type="application/zip",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Upload clip MinIO thất bại: %s", exc)
+        return None
+
+    base = settings.MINIO_PUBLIC_URL or (
+        f"{'https' if settings.MINIO_SECURE else 'http'}://"
+        f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}"
+    )
+    return f"{base.rstrip('/')}/{name}"

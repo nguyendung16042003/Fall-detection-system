@@ -84,7 +84,7 @@ for idx, video_path in enumerate(video_files, start=1):
         pose_name = CLASS_NAMES[cls_id]
 
         rows.append({
-            "video_name": video_path.name,
+            "video_name": str(video_path),
             "frame_id": frame_idx,
             "pose": pose_name
         })

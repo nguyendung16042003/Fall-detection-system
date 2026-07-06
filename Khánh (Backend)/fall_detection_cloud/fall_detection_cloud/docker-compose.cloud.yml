@@ -50,7 +50,7 @@ services:
 
   # 4. MediaMTX - Media Server cho HLS Live Streaming
   mediamtx:
-    image: aler9/rtsp-simple-server:latest
+    image: bluenviron/mediamtx:latest
     container_name: fall_mediamtx
     restart: always
     ports:
@@ -58,10 +58,6 @@ services:
       - "8888:8888"   # HLS (phát ra cho mobile app)
       - "8889:8889"   # WebRTC (low latency)
       - "1935:1935"   # RTMP
-    volumes:
-      - ./mediamtx.yml:/mediamtx.yml:ro
-    environment:
-      - RTSP_PROTOCOLS=tcp
 
   # 5. Ứng dụng Backend FastAPI
   backend:

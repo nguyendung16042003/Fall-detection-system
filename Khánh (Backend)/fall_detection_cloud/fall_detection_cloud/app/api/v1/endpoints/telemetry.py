@@ -8,40 +8,9 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.telemetry import TelemetryLog
 from app.models.user import User
-from app.schemas.telemetry import TelemetryIn, TelemetryLatest
+from app.schemas.telemetry import TelemetryLatest
 
 router = APIRouter()
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_telemetry(
-    telemetry: TelemetryIn,
-    db: Session = Depends(get_db),
-) -> dict:
-    """Nhận telemetry từ Edge (REST endpoint fallback cho MQTT).
-
-    Edge có thể gửi telemetry qua MQTT hoặc REST. Endpoint này dùng
-    làm fallback khi MQTT không khả dụng.
-    """
-    log = TelemetryLog(
-        cam_id=telemetry.cam_id,
-        timestamp_utc=telemetry.timestamp_utc,
-        pipeline_status=telemetry.pipeline.state if telemetry.pipeline else None,
-        fps_pgie=telemetry.pipeline.fps_pgie if telemetry.pipeline else None,
-        fps_sgie=telemetry.pipeline.fps_sgie if telemetry.pipeline else None,
-        active_tracks=telemetry.pipeline.active_tracks if telemetry.pipeline else None,
-        ram_used_mb=telemetry.system.ram_used_mb if telemetry.system else None,
-        ram_total_mb=telemetry.system.ram_total_mb if telemetry.system else None,
-        cpu_temp_c=telemetry.system.cpu_temp_c if telemetry.system else None,
-        gpu_temp_c=telemetry.system.gpu_temp_c if telemetry.system else None,
-        cpu_usage_pct=telemetry.system.cpu_usage_pct if telemetry.system else None,
-        disk_free_gb=telemetry.system.disk_free_gb if telemetry.system else None,
-        mqtt_connected=telemetry.network.mqtt_connected if telemetry.network else None,
-        last_event_sent_utc=telemetry.network.last_event_sent_utc if telemetry.network else None,
-    )
-    db.add(log)
-    db.commit()
-    return {"status": "success", "cam_id": telemetry.cam_id}
 
 
 @router.get("/{cam_id}/latest", response_model=TelemetryLatest)

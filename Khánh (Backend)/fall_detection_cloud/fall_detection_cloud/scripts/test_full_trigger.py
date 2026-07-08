@@ -53,15 +53,15 @@ def create_mock_event_payload(cam_id: str = "cam_01") -> dict:
         })
     
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "event_id": str(uuid4()),
         "cam_id": cam_id,
         "person_id": 1,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "event_type": "fall_candidate",
         "detection": {
-            "class_before": "standing",
-            "final_class": "lying",
+            "class_before": "stand",
+            "final_class": "lie",
             "confidence": 0.92,
             "bbox_xyxy": [120, 80, 380, 420],
             "frame_width": 1280,
@@ -69,7 +69,7 @@ def create_mock_event_payload(cam_id: str = "cam_01") -> dict:
         },
         "rule": {
             "version": "1.0",
-            "trigger": "standing_to_lying",
+            "trigger": "stand_to_lie",
             "transition_ms": 1800,
             "window_ms": 2000
         },

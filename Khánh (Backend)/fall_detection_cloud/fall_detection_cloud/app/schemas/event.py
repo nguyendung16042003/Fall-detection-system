@@ -1,14 +1,37 @@
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class DetectionIn(BaseModel):
-    """detection.* trong mqtt_schema v2 fall_event."""
+class ClassBeforeEnum(str, Enum):
+    """class_before enum theo mqtt_schema v3 - chỉ stand/sit."""
+    STAND = "stand"
+    SIT = "sit"
 
-    class_before: str | None = None
-    final_class: str | None = None
+
+class FinalClassEnum(str, Enum):
+    """final_class enum theo mqtt_schema v3 - tên gốc model SGIE."""
+    STAND = "stand"
+    SIT = "sit"
+    LIE = "lie"
+    BEND = "bend"
+    EXERCISE = "exercise"
+    HALF_PERSON = "half_person"
+
+
+class TriggerEnum(str, Enum):
+    """trigger enum theo mqtt_schema v3."""
+    STAND_TO_LIE = "stand_to_lie"
+    SIT_TO_LIE = "sit_to_lie"
+
+
+class DetectionIn(BaseModel):
+    """detection.* trong mqtt_schema v3 fall_event."""
+
+    class_before: ClassBeforeEnum | None = None
+    final_class: FinalClassEnum | None = None
     confidence: float | None = None
     bbox_xyxy: list[int] | None = Field(default=None, min_length=4, max_length=4)
     frame_width: int | None = None
@@ -17,7 +40,7 @@ class DetectionIn(BaseModel):
 
 class RuleIn(BaseModel):
     version: str | None = None
-    trigger: str | None = None
+    trigger: TriggerEnum | None = None
     transition_ms: int | None = None
     window_ms: int | None = None
 

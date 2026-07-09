@@ -7,6 +7,15 @@ Chạy: python scripts/mock_mqtt_publish.py [cam_id] [host] [port]
 Yêu cầu: RabbitMQ bật MQTT plugin (port 1883) và server đang chạy.
 """
 
+"""Giả lập Edge (Jetson) publish event/telemetry qua MQTT — mqtt_schema v2.
+
+Publish 1 fall_event tới events/cam_{id}/fall và 1 telemetry tới
+telemetry/cam_{id}/status để kiểm thử MQTT consumer của server.
+
+Chạy: python scripts/mock_mqtt_publish.py [cam_id] [host] [port]
+Yêu cầu: RabbitMQ bật MQTT plugin (port 1883) và server đang chạy.
+"""
+
 import base64
 import json
 import sys
@@ -42,14 +51,14 @@ def main() -> None:
         "timestamp": "2026-06-20T07:00:00Z",
         "event_type": "fall_candidate",
         "detection": {
-            "class_before": "standing",
-            "final_class": "lying",
+            "class_before": "stand",
+            "final_class": "lie",
             "confidence": 0.63,
             "bbox_xyxy": [100, 120, 320, 400],
             "frame_width": 1280,
             "frame_height": 720,
         },
-        "rule": {"trigger": "transition", "transition_ms": 800,
+        "rule": {"trigger": "stand_to_lie", "transition_ms": 800,
                  "window_ms": 2000},
         "frames": [
             {"offset_ms": off, "jpeg_b64": _JPEG}

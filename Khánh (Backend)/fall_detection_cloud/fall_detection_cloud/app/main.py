@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -12,15 +14,34 @@ from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.mqtt_consumer import consumer
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    consumer.start()
+    # Start MQTT consumer in background thread (consumer.start() is blocking)
+    def start_consumer():
+        try:
+            consumer.start()
+            logger.info("MQTT consumer started successfully")
+        except Exception as e:
+            logger.error(f"MQTT consumer failed to start: {e}")
+
+    thread = threading.Thread(target=start_consumer, daemon=True)
+    thread.start()
+    logger.info("MQTT consumer thread started")
+    
+    # Wait a bit for consumer to initialize
+    await asyncio.sleep(1)
+    
     yield
+    
     consumer.stop()
+    logger.info("MQTT consumer stopped")
 
 
 app = FastAPI(title=settings.PROJECT_NAME, version="2.0.0", lifespan=lifespan)

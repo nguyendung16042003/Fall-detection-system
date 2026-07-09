@@ -92,11 +92,17 @@ class MQTTConsumer:
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
+        logger.info("MQTT consumer.start() called")
+        logger.info(f"MQTT_ENABLED={settings.MQTT_ENABLED}")
+        logger.info(f"MQTT_HOST={settings.MQTT_HOST}")
+        logger.info(f"MQTT_PORT={settings.MQTT_PORT}")
+        
         if not settings.MQTT_ENABLED:
             logger.info("MQTT tắt (MQTT_ENABLED=false), bỏ qua consumer")
             return
         try:
             import paho.mqtt.client as mqtt
+            logger.info("paho-mqtt imported successfully")
         except ImportError:
             logger.warning("Chưa cài 'paho-mqtt'; bỏ qua MQTT consumer")
             return
@@ -119,6 +125,7 @@ class MQTTConsumer:
         client.on_message = _on_message
 
         try:
+            logger.info(f"Attempting to connect to {settings.MQTT_HOST}:{settings.MQTT_PORT}")
             client.connect_async(settings.MQTT_HOST, settings.MQTT_PORT, 60)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Không kết nối được MQTT broker: %s", exc)

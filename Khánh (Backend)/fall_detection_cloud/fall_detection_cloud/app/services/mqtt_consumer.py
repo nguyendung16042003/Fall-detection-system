@@ -12,16 +12,31 @@ làm sập app (REST POST /events vẫn là đường dự phòng).
 import json
 import logging
 import threading
+import time
+from collections import deque
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.logging_config import get_logger
 from app.schemas.event import EventCreate
 from app.schemas.telemetry import TelemetryIn
 from app.services.alert_pipeline import run_pipeline
 from app.services.event_ingest import CameraNotFoundError, ingest_event
 from app.services.telemetry_ingest import ingest_telemetry
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+# P99 latency tracking
+latencies = deque(maxlen=1000)
+
+
+def compute_p99() -> float | None:
+    """Compute P99 latency from recorded latencies."""
+    if not latencies:
+        return None
+    sorted_lat = sorted(latencies)
+    idx = int(len(sorted_lat) * 0.99)
+    return sorted_lat[min(idx, len(sorted_lat) - 1)]
 
 
 def _cam_id_from_topic(topic: str) -> str | None:
@@ -31,6 +46,14 @@ def _cam_id_from_topic(topic: str) -> str | None:
 
 
 def _handle_fall(payload: dict, cam_id: str | None) -> None:
+    t0 = time.perf_counter()
+    event_id = payload.get("event_id")
+    
+    # Bind event_id to logger context for tracing
+    ctx_logger = logger.bind(event_id=event_id, cam_id=cam_id)
+    
+    ctx_logger.info("event_received", event_type="fall_candidate")
+    
     if cam_id and not payload.get("cam_id"):
         payload["cam_id"] = cam_id
     data = EventCreate.model_validate(payload)
@@ -38,11 +61,14 @@ def _handle_fall(payload: dict, cam_id: str | None) -> None:
     try:
         event, frame, all_frames = ingest_event(db, data)
         result = run_pipeline(db, event, image_bytes=frame, frames_bytes=all_frames)
-        logger.info("MQTT fall %s -> %s", event.id, result)
+        ctx_logger.info("event_processed", event_db_id=event.id, result=str(result))
     except CameraNotFoundError as exc:
-        logger.warning("MQTT fall: camera không tồn tại cam_id=%s", exc)
+        ctx_logger.warning("camera_not_found", error=str(exc))
     finally:
         db.close()
+        latency = time.perf_counter() - t0
+        latencies.append(latency)
+        ctx_logger.info("event_latency", latency_ms=latency * 1000)
 
 
 def _handle_telemetry(payload: dict, cam_id: str | None) -> None:

@@ -4,6 +4,8 @@ Nếu nhận được 2 sự kiện ngã từ 2 camera khác nhau nhưng có tim
 dưới 2 giây, hệ thống phải gộp lại thành 1 sự kiện duy nhất. Tối ưu chi phí:
 chỉ gọi VLM 1 lần và gửi 1 thông báo duy nhất cho người dùng đối với các sự
 kiện đã gộp.
+
+Sử dụng Postgres advisory lock để tránh race condition khi xử lý concurrent events.
 """
 
 import logging
@@ -13,6 +15,7 @@ from typing import Dict, List, Optional, Set
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.models.event import Event
 from app.models.camera import Camera
@@ -161,6 +164,32 @@ def find_nearby_events(
     )
     
     return nearby_events
+
+
+def acquire_dedup_lock(db: Session, lock_key: int) -> bool:
+    """
+    Acquire Postgres advisory lock for dedup operations.
+    
+    Returns True if lock acquired, False otherwise.
+    """
+    try:
+        result = db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to acquire advisory lock for key {lock_key}: {e}")
+        return False
+
+
+def compute_lock_key(timestamp: datetime, camera_id: int) -> int:
+    """
+    Compute lock key based on timestamp window and camera.
+    
+    Uses time window (2s) to group events that should be deduped together.
+    """
+    epoch_seconds = timestamp.timestamp()
+    windowed = int(epoch_seconds // DEDUP_WINDOW_SEC) * DEDUP_WINDOW_SEC
+    # Combine windowed timestamp with camera_id to create unique lock key
+    return hash((int(windowed), camera_id)) % (2**31)
 
 
 def should_merge_events(event1: Event, event2: Event) -> bool:

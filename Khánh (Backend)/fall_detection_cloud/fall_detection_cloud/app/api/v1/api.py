@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     config,
     devices,
     events,
+    health,
     live,
     telemetry,
     users,
@@ -24,3 +25,4 @@ api_router.include_router(live.router, prefix="/live", tags=["live"])
 api_router.include_router(
     telemetry.router, prefix="/telemetry", tags=["telemetry"]
 )
+api_router.include_router(health.router, prefix="/health", tags=["health"])

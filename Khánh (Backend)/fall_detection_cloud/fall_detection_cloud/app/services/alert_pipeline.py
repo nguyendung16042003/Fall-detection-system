@@ -81,22 +81,38 @@ def run_pipeline(
     result = PipelineResult(event_id=str(event.id))
     camera_name = event.camera.name if event.camera else None
 
-    # 0. Dedup multi-camera events (trước khi xử lý VLM)
-    deduplicator = get_deduplicator()
-    merged_group = deduplicator.add_event(event)
+    # 0. Dedup multi-camera events với Postgres advisory lock để tránh race condition
+    from app.services.dedup import compute_lock_key, acquire_dedup_lock, get_deduplicator
     
-    if merged_group and len(merged_group) > 1:
-        # Event đã được gộp với event khác
-        result.notes.append(f"Event gộp với {len(merged_group) - 1} event khác trong window 2s")
-        # Chỉ xử lý VLM cho representative event (event đầu tiên trong group)
-        if event.id != merged_group[0]:
-            # Đây là event phụ, đánh dấu merged và skip
-            event.status = "merged"
-            db.add(event)
-            db.commit()
-            result.suppressed = True
-            result.notes.append("Event phụ đã gộp, skip VLM và alert")
-            return result
+    lock_key = compute_lock_key(event.timestamp_utc, event.camera_id)
+    
+    # Acquire advisory lock trong transaction để đảm bảo chỉ 1 event được xử lý cùng lúc
+    try:
+        # Bắt transaction mới để lock chỉ giữ trong thời gian ngắn
+        db.begin_nested()
+        acquire_dedup_lock(db, lock_key)
+        
+        deduplicator = get_deduplicator()
+        merged_group = deduplicator.add_event(event)
+        
+        if merged_group and len(merged_group) > 1:
+            # Event đã được gộp với event khác
+            result.notes.append(f"Event gộp với {len(merged_group) - 1} event khác trong window 2s")
+            # Chỉ xử lý VLM cho representative event (event đầu tiên trong group)
+            if event.id != merged_group[0]:
+                # Đây là event phụ, đánh dấu merged và skip
+                event.status = "merged"
+                db.add(event)
+                db.commit()
+                result.suppressed = True
+                result.notes.append("Event phụ đã gộp, skip VLM và alert")
+                return result
+        
+        # Commit nested transaction để release lock sớm
+        db.commit()
+    except Exception as e:
+        logger.warning(f"Error during dedup lock: {e}")
+        db.rollback()
     
     rule = (
         db.query(CameraRule)

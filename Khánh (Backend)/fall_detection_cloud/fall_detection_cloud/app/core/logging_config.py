@@ -18,6 +18,13 @@ def add_app_context(_: str, _2: str, event_dict: EventDict) -> EventDict:
 
 def configure_logging() -> None:
     """Configure structlog for JSON output with timestamps."""
+    # Configure standard library logging first
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.INFO,
+    )
+    
     structlog.configure(
         processors=[
             # Add log level
@@ -35,11 +42,11 @@ def configure_logging() -> None:
             structlog.processors.JSONRenderer(),
         ],
         # Use standard library logging under the hood
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        wrapper_class=structlog.stdlib.BoundLogger,
         # Context class for storing context
         context_class=dict,
-        # Logger factory
-        logger_factory=structlog.PrintLoggerFactory(),
+        # Logger factory - use standard library
+        logger_factory=structlog.stdlib.LoggerFactory(),
         # Cache logger
         cache_logger_on_first_use=True,
     )

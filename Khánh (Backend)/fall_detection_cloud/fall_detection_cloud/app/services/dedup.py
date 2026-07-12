@@ -182,14 +182,15 @@ def acquire_dedup_lock(db: Session, lock_key: int) -> bool:
 
 def compute_lock_key(timestamp: datetime, camera_id: int) -> int:
     """
-    Compute lock key based on timestamp window and camera.
+    Compute lock key based on timestamp window only.
     
     Uses time window (2s) to group events that should be deduped together.
+    All cameras in same time window share the same lock to prevent race condition.
     """
     epoch_seconds = timestamp.timestamp()
     windowed = int(epoch_seconds // DEDUP_WINDOW_SEC) * DEDUP_WINDOW_SEC
-    # Combine windowed timestamp with camera_id to create unique lock key
-    return hash((int(windowed), camera_id)) % (2**31)
+    # Use only windowed timestamp to create shared lock key for all cameras
+    return hash(int(windowed)) % (2**31)
 
 
 def should_merge_events(event1: Event, event2: Event) -> bool:

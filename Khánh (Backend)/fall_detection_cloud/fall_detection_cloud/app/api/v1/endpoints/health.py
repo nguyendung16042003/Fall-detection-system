@@ -15,7 +15,7 @@ router = APIRouter()
 logger = get_logger(__name__)
 
 
-@router.get("/health/live")
+@router.get("/live")
 async def live() -> dict:
     """
     Liveness probe - checks if the process is running.
@@ -26,7 +26,7 @@ async def live() -> dict:
     return {"status": "ok"}
 
 
-@router.get("/health/ready")
+@router.get("/ready")
 async def ready(response: Response) -> dict:
     """
     Readiness probe - checks if the service is ready to handle requests.

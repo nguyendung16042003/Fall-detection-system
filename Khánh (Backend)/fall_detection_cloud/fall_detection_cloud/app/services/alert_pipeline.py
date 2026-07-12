@@ -82,7 +82,8 @@ def run_pipeline(
     camera_name = event.camera.name if event.camera else None
 
     # 0. Dedup multi-camera events với Postgres advisory lock để tránh race condition
-    from app.services.dedup import compute_lock_key, acquire_dedup_lock, get_deduplicator
+    from app.services.dedup import compute_lock_key, acquire_dedup_lock
+    from datetime import timedelta
     
     lock_key = compute_lock_key(event.timestamp_utc, event.camera_id)
     
@@ -92,21 +93,33 @@ def run_pipeline(
         db.begin_nested()
         acquire_dedup_lock(db, lock_key)
         
-        deduplicator = get_deduplicator()
-        merged_group = deduplicator.add_event(event)
+        # Check database for existing events trong 2s window
+        from app.models.event import Event as EventModel
+        from sqlalchemy import and_
         
-        if merged_group and len(merged_group) > 1:
-            # Event đã được gộp với event khác
-            result.notes.append(f"Event gộp với {len(merged_group) - 1} event khác trong window 2s")
-            # Chỉ xử lý VLM cho representative event (event đầu tiên trong group)
-            if event.id != merged_group[0]:
-                # Đây là event phụ, đánh dấu merged và skip
-                event.status = "merged"
-                db.add(event)
-                db.commit()
-                result.suppressed = True
-                result.notes.append("Event phụ đã gộp, skip VLM và alert")
-                return result
+        window_start = event.timestamp_utc - timedelta(seconds=2)
+        window_end = event.timestamp_utc + timedelta(seconds=2)
+        
+        existing_event = db.query(EventModel).filter(
+            and_(
+                EventModel.camera_id != event.camera_id,
+                EventModel.timestamp_utc >= window_start,
+                EventModel.timestamp_utc <= window_end,
+                EventModel.event_type == "fall_candidate",
+                EventModel.status.in_(["pending", "confirmed"])
+            )
+        ).first()
+        
+        if existing_event:
+            # Tìm thấy event khác trong window -> gộp
+            result.notes.append(f"Event gộp với event {existing_event.id} trong window 2s")
+            event.status = "merged"
+            event.note = f"Merged with event {existing_event.id}"
+            db.add(event)
+            db.commit()
+            result.suppressed = True
+            result.notes.append("Event phụ đã gộp, skip VLM và alert")
+            return result
         
         # Commit nested transaction để release lock sớm
         db.commit()

@@ -6,9 +6,14 @@ with timestamps <2s apart to trigger the race condition scenario.
 
 import asyncio
 import json
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.database import SessionLocal
 from app.models.event import Event
@@ -89,7 +94,7 @@ def test_no_double_notification():
             db.refresh(cam2)
         
         # Clear existing events
-        db.query(Event).filter(Event.cam_id.in_([cam1.id, cam2.id])).delete()
+        db.query(Event).filter(Event.camera_id.in_([cam1.id, cam2.id])).delete()
         db.commit()
         
         # Create 2 events with timestamps <2s apart
@@ -102,26 +107,28 @@ def test_no_double_notification():
         event1, _, _ = ingest_event(db, event1_data)
         event2, _, _ = ingest_event(db, event2_data)
         
-        print(f"Event 1: id={event1.id}, cam_id={event1.cam_id}, timestamp={event1.timestamp_utc}")
-        print(f"Event 2: id={event2.id}, cam_id={event2.cam_id}, timestamp={event2.timestamp_utc}")
+        print(f"Event 1: id={event1.id}, camera_id={event1.camera_id}, timestamp={event1.timestamp_utc}")
+        print(f"Event 2: id={event2.id}, camera_id={event2.camera_id}, timestamp={event2.timestamp_utc}")
         
         # Process events concurrently (simulating race condition)
         print("[Step 3] Processing events concurrently...")
         
-        def process_event(event):
+        def process_event(event_id):
             try:
                 db_session = SessionLocal()
-                result = run_pipeline(db_session, event)
+                event = db_session.query(Event).filter(Event.id == event_id).first()
+                if event:
+                    result = run_pipeline(db_session, event)
                 db_session.close()
                 return result
             except Exception as e:
-                print(f"Error processing event {event.id}: {e}")
+                print(f"Error processing event {event_id}: {e}")
                 return None
         
         # Run in threads to simulate concurrent processing
         import threading
-        t1 = threading.Thread(target=process_event, args=(event1,))
-        t2 = threading.Thread(target=process_event, args=(event2,))
+        t1 = threading.Thread(target=process_event, args=(event1.id,))
+        t2 = threading.Thread(target=process_event, args=(event2.id,))
         
         t1.start()
         t2.start()
@@ -135,17 +142,17 @@ def test_no_double_notification():
         db.refresh(event2)
         
         confirmed_count = db.query(Event).filter(
-            Event.cam_id.in_([cam1.id, cam2.id]),
+            Event.camera_id.in_([cam1.id, cam2.id]),
             Event.status == "confirmed"
         ).count()
         
         merged_count = db.query(Event).filter(
-            Event.cam_id.in_([cam1.id, cam2.id]),
+            Event.camera_id.in_([cam1.id, cam2.id]),
             Event.status == "merged"
         ).count()
         
         total_count = db.query(Event).filter(
-            Event.cam_id.in_([cam1.id, cam2.id])
+            Event.camera_id.in_([cam1.id, cam2.id])
         ).count()
         
         print(f"\nResults:")

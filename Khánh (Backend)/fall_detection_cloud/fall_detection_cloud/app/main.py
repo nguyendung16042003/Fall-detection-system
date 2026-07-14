@@ -59,7 +59,15 @@ _STATUS_CODE_NAMES = {
     422: "VALIDATION_ERROR",
     500: "INTERNAL_ERROR",
 }
+from fastapi.middleware.cors import CORSMiddleware
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def _error_body(code: str, message: object, details: object = None) -> dict:
     body: dict[str, object] = {"code": code, "message": message}

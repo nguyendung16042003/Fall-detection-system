@@ -14,10 +14,10 @@ datasets/
 #*.pyc
 
 # VS Code
-.vscode/
+#.vscode/
 
 # Environment
-.env
+#.env
 
 # Conda / venv
 #venv/

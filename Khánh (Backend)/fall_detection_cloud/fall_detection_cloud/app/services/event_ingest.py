@@ -100,6 +100,7 @@ def ingest_event(
         rule_trigger=data.rule.trigger if data.rule else None,
         transition_ms=data.rule.transition_ms if data.rule else None,
         image_url=image_url,
+        clip_url=data.clip_url,  # For manual testing purposes
         status=data.status or "pending",
     )
     db.add(event)

@@ -100,7 +100,7 @@ def create_event(
             detail="Thiếu timestamp_utc",
         )
     try:
-        event, _frame = ingest_event(db, payload)
+        event, _frame, _frames = ingest_event(db, payload)
     except CameraNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

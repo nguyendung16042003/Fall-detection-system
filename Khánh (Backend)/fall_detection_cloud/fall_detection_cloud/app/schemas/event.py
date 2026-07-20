@@ -55,6 +55,8 @@ class EventCreate(BaseModel):
 
     Edge định danh camera bằng `cam_id` chuỗi (vd cam_01); server tra ra UUID
     camera. `event_id` (uuid Edge tạo) được dùng làm khóa chính nếu hợp lệ.
+    
+    Note: clip_url is optional for manual testing purposes (not in mqtt_schema).
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -71,6 +73,7 @@ class EventCreate(BaseModel):
     frames: list[FrameIn] | None = None
 
     status: str = Field(default="pending")
+    clip_url: str | None = None  # Optional for manual testing
 
 
 class EventCreateResponse(BaseModel):

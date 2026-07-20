@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fall Event Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#0A0E14;
+    --panel:#10161F;
+    --panel-2:#141B26;
+    --border:#1C2530;
+    --text:#DCE4EC;
+    --text-muted:#6B7684;
+    --accent-ok:#38D9A9;
+    --accent-warn:#F5A623;
+    --accent-alert:#FF5D5D;
+    --accent-focus:#5B8DEF;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(1200px 600px at 80% -10%, #101826 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Space Grotesk',sans-serif;}
+
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(10,14,20,0.85);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--border);
+    padding:14px 20px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand h1{font-size:16px; margin:0; letter-spacing:0.02em; font-weight:700;}
+  .brand .sub{font-size:11px; color:var(--text-muted); margin-top:1px;}
+
+  .status-cluster{display:flex; align-items:center; gap:16px;}
+  .status-pill{
+    display:flex; align-items:center; gap:8px;
+    padding:6px 12px; border-radius:999px;
+    border:1px solid var(--border); background:var(--panel-2);
+    font-size:12px; color:var(--text-muted);
+  }
+  .pulse-wrap{position:relative; width:10px; height:10px;}
+  .pulse-dot{
+    width:10px; height:10px; border-radius:50%;
+    background:var(--accent-muted, #6B7684);
+    position:relative; z-index:2;
+  }
+  .pulse-ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:1.5px solid var(--accent-muted, #6B7684);
+    animation:ping 3s ease-out infinite;
+  }
+  .status-pill.ok .pulse-dot, .status-pill.ok .pulse-ring{ background:var(--accent-ok); border-color:var(--accent-ok);}
+  .status-pill.ok .pulse-ring{background:transparent;}
+  .status-pill.err .pulse-dot{background:var(--accent-alert);}
+  .status-pill.err .pulse-ring{display:none;}
+  .status-pill.idle .pulse-dot{background:var(--text-muted);}
+  .status-pill.idle .pulse-ring{display:none;}
+  @keyframes ping{
+    0%{ transform:scale(1); opacity:0.7; }
+    80%{ transform:scale(2.4); opacity:0; }
+    100%{ opacity:0; }
+  }
+
+  button{
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+    color:var(--text); background:var(--panel-2); border:1px solid var(--border);
+    padding:8px 12px; border-radius:8px; cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+    transition:border-color .15s, background .15s;
+  }
+  button:hover{border-color:var(--accent-focus);}
+  button.primary{background:var(--accent-focus); border-color:var(--accent-focus); color:#0A0E14;}
+  button.primary:hover{filter:brightness(1.08);}
+  button.on{color:var(--accent-ok); border-color:var(--accent-ok);}
+  button.danger:hover{border-color:var(--accent-alert); color:var(--accent-alert);}
+  button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid var(--accent-focus); outline-offset:2px;}
+
+  main{max-width:980px; margin:0 auto; padding:18px 20px 60px;}
+
+  #configPanel{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px; margin-bottom:18px; display:none;
+  }
+  #configPanel.open{display:block;}
+  #configPanel h2{font-size:13px; margin:0 0 4px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted);}
+  .field-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;}
+  .field{display:flex; flex-direction:column; gap:5px;}
+  .field.full{grid-column:1 / -1;}
+  .field label{font-size:11.5px; color:var(--text-muted);}
+  .field input, .field select{
+    background:var(--bg); border:1px solid var(--border); border-radius:7px;
+    padding:9px 10px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12.5px;
+  }
+  .hint{font-size:11.5px; color:var(--text-muted); line-height:1.5; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);}
+  .hint b{color:var(--text);}
+  .config-actions{display:flex; gap:8px; margin-top:14px;}
+
+  .stats-strip{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px;}
+  .stat-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 14px;
+  }
+  .stat-card .num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;}
+  .stat-card .lbl{font-size:11px; color:var(--text-muted); margin-top:2px;}
+  .stat-card.alert .num{color:var(--accent-alert);}
+
+  .toolbar{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;}
+  .toolbar-left{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .toolbar select{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:8px 10px; border-radius:8px; font-size:12.5px; font-family:'Inter',sans-serif;
+  }
+
+  #feed{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    min-height:200px; max-height:66vh; overflow-y:auto;
+  }
+  .empty-state{padding:50px 20px; text-align:center; color:var(--text-muted); font-size:13px;}
+
+  .row{
+    border-bottom:1px solid var(--border);
+    padding:12px 14px;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .row:last-child{border-bottom:none;}
+  .row.sev-alert{border-left:3px solid var(--accent-alert);}
+  .row.sev-warn{border-left:3px solid var(--accent-warn);}
+  .row.sev-info{border-left:3px solid transparent;}
+  .row.flash{animation:flashIn 1.8s ease-out;}
+  @keyframes flashIn{
+    0%{ background:rgba(91,141,239,0.16); }
+    100%{ background:transparent; }
+  }
+  .row-top{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  .row-main{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .time{font-size:12px; color:var(--text-muted); min-width:76px;}
+  .cam-badge{
+    font-family:'JetBrains Mono',monospace; font-size:11.5px;
+    background:var(--panel-2); border:1px solid var(--border);
+    padding:2px 8px; border-radius:6px; color:var(--text);
+  }
+  .type-badge{
+    font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:6px;
+  }
+  .type-badge.alert{background:rgba(255,93,93,0.14); color:var(--accent-alert);}
+  .type-badge.warn{background:rgba(245,166,35,0.14); color:var(--accent-warn);}
+  .type-badge.info{background:rgba(56,217,169,0.12); color:var(--accent-ok);}
+  .toggle-json{font-size:11px; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:2px 4px; text-decoration:underline; text-underline-offset:2px;}
+  .toggle-json:hover{color:var(--accent-focus);}
+  pre.json{
+    display:none; margin:6px 0 0; padding:10px; background:var(--bg);
+    border:1px solid var(--border); border-radius:7px; font-size:11.5px;
+    overflow-x:auto; color:var(--text); max-height:220px; overflow-y:auto;
+  }
+  pre.json.open{display:block;}
+
+  .play-clip{font-size:11px; color:var(--accent-focus); background:none; border:none; cursor:pointer; padding:2px 4px; font-weight:600;}
+  .play-clip:hover{color:var(--accent-ok);}
+
+  .clip-modal-overlay{
+    position:fixed; inset:0; background:rgba(4,6,10,0.82);
+    display:none; align-items:center; justify-content:center;
+    z-index:100; padding:20px;
+  }
+  .clip-modal-overlay.open{display:flex;}
+  .clip-modal{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    max-width:640px; width:100%; overflow:hidden;
+  }
+  .clip-modal-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; border-bottom:1px solid var(--border);
+  }
+  .clip-modal-header .titles{display:flex; flex-direction:column; gap:2px;}
+  .clip-modal-header .title{font-size:13px; font-weight:600;}
+  .clip-modal-header .sub{font-size:11px; color:var(--text-muted);}
+  .clip-modal-close{background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:2px 8px; line-height:1;}
+  .clip-modal-close:hover{color:var(--accent-alert);}
+  .clip-modal-body{padding:14px 16px;}
+  .clip-modal-body video{width:100%; max-height:60vh; border-radius:7px; background:#000; display:block;}
+  .clip-fallback{padding:34px 12px; text-align:center; color:var(--text-muted); font-size:13px; line-height:1.6;}
+  .clip-fallback .mono{display:block; margin-top:10px; font-size:11px; word-break:break-all; color:var(--text-muted);}
+
+  footer{text-align:center; color:var(--text-muted); font-size:11px; padding:20px 0 0;}
+
+  @media (max-width:640px){
+    .field-grid{grid-template-columns:1fr;}
+    .stats-strip{grid-template-columns:repeat(2,1fr);}
+  }
+
+  .auth-tabs{display:flex; gap:4px; margin-bottom:14px;}
+  .auth-tab{
+    background:var(--panel-2); border:1px solid var(--border); border-bottom:none;
+    border-radius:8px 8px 0 0; padding:8px 16px; font-size:12.5px; font-weight:600;
+    color:var(--text-muted); cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .auth-tab.active{color:var(--text); background:var(--bg); border-color:var(--accent-focus);}
+  .auth-form{display:none;}
+  .auth-form.active{display:block;}
+  .auth-msg{font-size:12px; margin-top:8px; min-height:14px;}
+  .auth-msg.err{color:var(--accent-alert);}
+  .auth-msg.ok{color:var(--accent-ok);}
+  .auth-status-card{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    padding:12px 14px;
+  }
+  .auth-status-card .who{font-size:13px; font-weight:600;}
+  .auth-status-card .exp{font-size:11.5px; color:var(--text-muted); margin-top:2px;}
+  .section-divider{border-top:1px dashed var(--border); margin:16px 0;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="pulse-wrap" id="headerPulse"><div class="pulse-ring"></div><div class="pulse-dot"></div></div>
+    <div>
+      <h1 class="display">FALL EVENT MONITOR</h1>
+      <div class="sub mono">Multi-Camera Fall Detection · Edge-Cloud Test Dashboard</div>
+    </div>
+  </div>
+  <div class="status-cluster">
+    <div class="status-pill idle" id="statusPill">
+      <span id="statusText">Chưa kết nối</span>
+    </div>
+    <button id="configToggle">⚙ Cấu hình</button>
+  </div>
+</header>
+
+<main>
+
+  <div id="configPanel">
+    <h2>API Base URL</h2>
+    <div class="field-grid">
+      <div class="field full">
+        <label>Địa chỉ máy chạy backend (dùng chung cho đăng nhập lẫn theo dõi sự kiện), ví dụ http://192.168.1.50:8000</label>
+        <input id="apiBase" type="text" placeholder="http://<ip-máy-khánh>:8000">
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <h2>Tài khoản</h2>
+    <div id="authLoggedOut">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-tab="login">Đăng nhập</button>
+        <button type="button" class="auth-tab" data-tab="register">Đăng ký</button>
+      </div>
+      <div id="authFormLogin" class="auth-form active">
+        <div class="field-grid">
+          <div class="field">
+            <label>Username</label>
+            <input id="loginUsername" type="text" placeholder="Username">
+          </div>
+          <div class="field">
+            <label>Mật khẩu</label>
+            <input id="loginPassword" type="password" placeholder="••••••••">
+          </div>
+        </div>
+        <div class="config-actions">
+          <button class="primary" id="loginBtn">Đăng nhập</button>
+        </div>
+        <div class="auth-msg" id="loginMsg"></div>
+      </div>
+      <div id="authFormRegister" class="auth-form">
+        <div class="field-grid">
+          <div class="field">
+            <label>Username</label>
+            <input id="regUsername" type="text" placeholder="Username">
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input id="regEmail" type="email" placeholder="sample@example.com">
+          </div>
+          <div class="field">
+            <label>Mật khẩu</label>
+            <input id="regPassword" type="password" placeholder="••••••••">
+          </div>
+          <div class="field">
+            <label>Role (giá trị mẫu trong Swagger: "caregiver" — nếu backend có role khác như "admin"/"family" thì gõ đúng giá trị đó)</label>
+            <input id="regRole" type="text" value="caregiver">
+          </div>
+        </div>
+        <div class="config-actions">
+          <button class="primary" id="registerBtn">Đăng ký</button>
+        </div>
+        <div class="auth-msg" id="registerMsg"></div>
+      </div>
+      <div class="hint">
+        Nếu đăng nhập/đăng ký báo lỗi <b>422</b> (thiếu hoặc sai field): mở <span class="mono">/docs</span>, xem đúng tên field backend yêu cầu (có thể là <span class="mono">username</span> thay vì <span class="mono">email</span>, hoặc cần thêm field khác) — báo lại để tôi chỉnh đúng theo backend thật.
+      </div>
+    </div>
+    <div id="authLoggedIn" style="display:none;">
+      <div class="auth-status-card">
+        <div>
+          <div class="who" id="authUserLabel">Đã đăng nhập</div>
+          <div class="exp mono" id="authExpiryLabel">–</div>
+        </div>
+        <button class="danger" id="logoutBtn">Đăng xuất</button>
+      </div>
+    </div>
+    <div class="field-grid" style="margin-top:14px;">
+      <div class="field">
+        <label>Đường dẫn Login</label>
+        <input id="loginPath" type="text" value="/api/auth/login">
+      </div>
+      <div class="field">
+        <label>Đường dẫn Register</label>
+        <input id="registerPath" type="text" value="/api/auth/register">
+      </div>
+      <div class="field">
+        <label>Đường dẫn Refresh (tự làm mới token khi sắp hết hạn)</label>
+        <input id="refreshPath" type="text" value="/api/auth/refresh">
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <h2>Kết nối &amp; theo dõi sự kiện</h2>
+    <div class="field-grid">
+      <div class="field">
+        <label>Đường dẫn endpoint sự kiện</label>
+        <input id="eventsPath" type="text" value="/api/events">
+      </div>
+      <div class="field">
+        <label>Bearer Token (tự điền sau khi đăng nhập ở trên — hoặc dán tay JWT lấy từ /docs nếu muốn bỏ qua form đăng nhập)</label>
+        <input id="token" type="text" placeholder="dán JWT token ở đây (để trống nếu API chưa yêu cầu auth)">
+      </div>
+      <div class="field">
+        <label>Chu kỳ polling (giây) — mỗi bao nhiêu giây hỏi backend 1 lần</label>
+        <input id="pollInterval" type="text" value="4">
+      </div>
+    </div>
+    <div class="config-actions">
+      <button class="primary" id="connectBtn">Kết nối &amp; bắt đầu theo dõi</button>
+      <button id="stopBtn">Dừng polling</button>
+      <button id="fakeEventBtn">Bắn sự kiện giả để test giao diện</button>
+    </div>
+    <div class="hint">
+      <b>Polling</b> nghĩa là trang web này tự động gọi lại API mỗi vài giây để hỏi "có gì mới không" — khác với WebSocket là backend tự đẩy dữ liệu xuống. Vì FastAPI hiện chỉ có REST (<span class="mono">GET /api/events</span>), polling là cách đơn giản nhất, không cần sửa backend.<br><br>
+      Nếu console trình duyệt báo lỗi <b>CORS</b> (bị chặn vì trang web và API khác gốc/địa chỉ): cần thêm <span class="mono">CORSMiddleware</span> vào FastAPI của Khánh, cho phép origin là nơi mở file này (ví dụ <span class="mono">null</span> nếu mở file trực tiếp, hoặc domain thật nếu host lên server).<br><br>
+      Bấm vào từng dòng sự kiện để xem <b>raw JSON</b> — dùng để đối chiếu tên field/cột thực tế backend trả về có khớp với <span class="mono">mqtt_schema.json</span> / <span class="mono">api_contract.md</span> không.
+    </div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-card"><div class="num display" id="statTotal">0</div><div class="lbl">Tổng sự kiện</div></div>
+    <div class="stat-card alert"><div class="num display" id="statAlerts">0</div><div class="lbl">Cảnh báo ngã</div></div>
+    <div class="stat-card"><div class="num display" id="statCams">0</div><div class="lbl">Camera hoạt động</div></div>
+    <div class="stat-card"><div class="num display" id="statLast">–</div><div class="lbl">Poll gần nhất</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <select id="camFilter"><option value="all">Tất cả camera</option></select>
+      <button id="soundBtn">🔊 Âm thanh: Tắt</button>
+      <button id="pauseBtn">⏸ Tạm dừng</button>
+    </div>
+    <button class="danger" id="clearBtn">🗑 Xoá danh sách (chỉ ở màn hình)</button>
+  </div>
+
+  <div id="feed">
+    <div class="empty-state" id="emptyState">Chưa có sự kiện nào. Mở phần "⚙ Cấu hình" ở trên, nhập địa chỉ API rồi bấm "Kết nối &amp; bắt đầu theo dõi".</div>
+  </div>
+
+  <footer>Dữ liệu chỉ lưu tạm trên trình duyệt trong phiên này — tải lại trang sẽ mất danh sách.</footer>
+</main>
+
+<div class="clip-modal-overlay" id="clipModal">
+  <div class="clip-modal">
+    <div class="clip-modal-header">
+      <div class="titles">
+        <span class="title" id="clipModalTitle">Clip sự kiện</span>
+        <span class="sub mono" id="clipModalSub">–</span>
+      </div>
+      <button class="clip-modal-close" id="clipModalClose">✕</button>
+    </div>
+    <div class="clip-modal-body" id="clipModalBody"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const state = {
+    apiBase:'', eventsPath:'/api/events', token:'', pollSec:4,
+    events:[], seenIds:new Set(), camFilter:'all',
+    paused:false, soundOn:false, timer:null, countdownTimer:null, nextPollAt:null,
+    connected:false
+  };
+  const authState = {
+    accessToken:'', refreshToken:'', expiresAt:null, email:'', refreshTimer:null
+  };
+
+  const $ = (id)=>document.getElementById(id);
+  const configPanel = $('configPanel');
+  const statusPill = $('statusPill');
+  const statusText = $('statusText');
+  const feed = $('feed');
+  const emptyState = $('emptyState');
+  const camFilterSel = $('camFilter');
+
+  $('configToggle').addEventListener('click', ()=> configPanel.classList.toggle('open'));
+
+  // ===== Tài khoản: đăng nhập / đăng ký / tự làm mới token =====
+  function extractToken(data){
+    return data.access_token || data.accessToken || data.token || null;
+  }
+  function extractRefreshToken(data){
+    return data.refresh_token || data.refreshToken || null;
+  }
+  function extractExpiresIn(data){
+    const v = (data.expires_in !== undefined) ? data.expires_in : data.expiresIn;
+    return (typeof v === 'number') ? v : null;
+  }
+  function setAuthUI(loggedIn){
+    $('authLoggedOut').style.display = loggedIn ? 'none' : 'block';
+    $('authLoggedIn').style.display = loggedIn ? 'block' : 'none';
+  }
+  function updateExpiryLabel(){
+    if(!authState.expiresAt){ $('authExpiryLabel').textContent = 'Không rõ thời hạn token (backend không trả expires_in)'; return; }
+    const msLeft = authState.expiresAt - Date.now();
+    if(msLeft<=0){ $('authExpiryLabel').textContent = 'Token đã hết hạn — cần đăng nhập lại'; return; }
+    $('authExpiryLabel').textContent = 'Token còn hạn ~' + Math.max(Math.round(msLeft/60000),0) + ' phút' + (authState.refreshToken ? ' (sẽ tự làm mới)' : '');
+  }
+  setInterval(()=>{ if(authState.accessToken) updateExpiryLabel(); }, 30000);
+
+  function applyAuthSuccess(data, identifier){
+    const token = extractToken(data);
+    if(!token) return false;
+    authState.accessToken = token;
+    authState.refreshToken = extractRefreshToken(data) || '';
+    const expIn = extractExpiresIn(data);
+    authState.expiresAt = expIn ? (Date.now() + expIn*1000) : null;
+    authState.email = identifier || authState.email;
+    $('token').value = token;
+    setAuthUI(true);
+    $('authUserLabel').textContent = 'Đã đăng nhập: ' + (authState.email || '(không rõ username)');
+    updateExpiryLabel();
+    scheduleAutoRefresh();
+    return true;
+  }
+
+  async function authRequest(path, body){
+    const base = $('apiBase').value.trim();
+    if(!base) throw new Error('Chưa nhập API Base URL ở trên');
+    const url = base.replace(/\/$/,'') + path;
+    const res = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    let data = {};
+    try{ data = await res.json(); }catch(e){}
+    if(!res.ok){
+      const detail = data.detail || data.message || data.error;
+      const msg = typeof detail === 'string' ? detail : (detail ? JSON.stringify(detail) : ('HTTP '+res.status));
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  $('loginBtn').addEventListener('click', async ()=>{
+    const username = $('loginUsername').value.trim();
+    const password = $('loginPassword').value;
+    const msg = $('loginMsg');
+    msg.textContent = 'Đang đăng nhập…'; msg.className = 'auth-msg';
+    try{
+      const data = await authRequest($('loginPath').value.trim() || '/api/auth/login', {username, password});
+      if(applyAuthSuccess(data, username)){
+        msg.textContent = 'Đăng nhập thành công.'; msg.className = 'auth-msg ok';
+      }else{
+        msg.textContent = 'Server phản hồi nhưng không thấy access_token — mở /docs kiểm tra lại cấu trúc response.';
+        msg.className = 'auth-msg err';
+      }
+    }catch(e){
+      msg.textContent = 'Lỗi: ' + e.message; msg.className = 'auth-msg err';
+    }
+  });
+
+  $('registerBtn').addEventListener('click', async ()=>{
+    const username = $('regUsername').value.trim();
+    const email = $('regEmail').value.trim();
+    const password = $('regPassword').value;
+    const role = $('regRole').value.trim();
+    const msg = $('registerMsg');
+    msg.textContent = 'Đang đăng ký…'; msg.className = 'auth-msg';
+    const body = {username, password, email, role};
+    try{
+      const data = await authRequest($('registerPath').value.trim() || '/api/auth/register', body);
+      if(applyAuthSuccess(data, username)){
+        msg.textContent = 'Đăng ký thành công, đã tự đăng nhập.'; msg.className = 'auth-msg ok';
+      }else{
+        msg.textContent = 'Đăng ký thành công. Chuyển qua tab "Đăng nhập" để lấy token.';
+        msg.className = 'auth-msg ok';
+      }
+    }catch(e){
+      msg.textContent = 'Lỗi: ' + e.message; msg.className = 'auth-msg err';
+    }
+  });
+
+  $('logoutBtn').addEventListener('click', ()=>{
+    authState.accessToken=''; authState.refreshToken=''; authState.expiresAt=null; authState.email='';
+    if(authState.refreshTimer) clearTimeout(authState.refreshTimer);
+    $('token').value = '';
+    setAuthUI(false);
+  });
+
+  async function doAutoRefresh(){
+    if(!authState.refreshToken) return;
+    try{
+      const data = await authRequest($('refreshPath').value.trim() || '/api/auth/refresh', {refresh_token: authState.refreshToken});
+      applyAuthSuccess(data, authState.email);
+    }catch(e){
+      console.warn('Tự làm mới token thất bại, cần đăng nhập lại thủ công:', e.message);
+    }
+  }
+  function scheduleAutoRefresh(){
+    if(authState.refreshTimer) clearTimeout(authState.refreshTimer);
+    if(!authState.expiresAt || !authState.refreshToken) return;
+    const msUntilRefresh = Math.max(authState.expiresAt - Date.now() - 60000, 5000);
+    authState.refreshTimer = setTimeout(doAutoRefresh, msUntilRefresh);
+  }
+
+  document.querySelectorAll('.auth-tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      $('authFormLogin').classList.toggle('active', tab.dataset.tab==='login');
+      $('authFormRegister').classList.toggle('active', tab.dataset.tab==='register');
+    });
+  });
+  // ===== Hết phần Tài khoản =====
+
+  function setStatus(mode, text){
+    statusPill.className = 'status-pill ' + mode;
+    statusText.textContent = text;
+  }
+
+  function beep(){
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type='sine'; o.frequency.value=880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.35);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime+0.4);
+    }catch(e){}
+  }
+
+  function notifyBrowser(ev){
+    if('Notification' in window && Notification.permission==='granted'){
+      const n = new Notification('⚠ Sự kiện ngã: '+(ev.cam_id||'?'), {
+        body: (ev.event_type||ev.event||'fall event') + ' · ' + fmtTime(getTs(ev))
+      });
+    }
+    if(state.soundOn) beep();
+  }
+
+  function getTs(ev){
+    return ev.timestamp||ev.created_at||ev.event_time||ev.time||null;
+  }
+  function fmtTime(ts){
+    if(!ts) return '–';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return String(ts);
+    return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  function severityOf(ev){
+    const type = (ev.event_type||ev.event||ev.class||'').toString().toLowerCase();
+    const level = (ev.level||'').toString().toLowerCase();
+    if(type.includes('fall') || level==='error') return 'alert';
+    if(level==='warning' || type.includes('not_found') || type.includes('warn')) return 'warn';
+    return 'info';
+  }
+  function idOf(ev){
+    return ev.event_id || ev.id || JSON.stringify(ev);
+  }
+  function getClipUrl(ev){
+    return ev.clip_url || ev.clip || ev.video_url || ev.video_clip_url || null;
+  }
+
+  const clipModal = $('clipModal');
+  function clipFallbackHTML(url, msg){
+    return `<div class="clip-fallback">🎬 ${msg}${url ? '<span class="mono">'+escapeHtml(url)+'</span>' : ''}</div>`;
+  }
+  function openClipModal(ev){
+    $('clipModalTitle').textContent = (ev.cam_id||'—') + ' · ' + (ev.event_type||ev.event||'event');
+    $('clipModalSub').textContent = fmtTime(getTs(ev));
+    const body = $('clipModalBody');
+    const url = getClipUrl(ev);
+    if(url){
+      body.innerHTML = `<video src="${escapeHtml(url)}" controls autoplay loop playsinline></video>`;
+      body.querySelector('video').addEventListener('error', ()=>{
+        body.innerHTML = clipFallbackHTML(url, 'Không tải được video từ URL này (link có thể hết hạn, sai định dạng, hoặc bị CORS chặn).');
+      });
+    }else{
+      body.innerHTML = clipFallbackHTML(null, 'Sự kiện này chưa có field clip_url/clip/video_url trong dữ liệu — có thể clip đang upload bất đồng bộ lên MinIO chưa xong, hoặc backend đặt tên field khác (bấm "xem raw JSON" để kiểm tra tên thật).');
+    }
+    clipModal.classList.add('open');
+  }
+  function closeClipModal(){
+    clipModal.classList.remove('open');
+    $('clipModalBody').innerHTML = '';
+  }
+  $('clipModalClose').addEventListener('click', closeClipModal);
+  clipModal.addEventListener('click', (e)=>{ if(e.target===clipModal) closeClipModal(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeClipModal(); });
+
+  function updateCamFilterOptions(){
+    const cams = Array.from(new Set(state.events.map(e=>e.cam_id).filter(Boolean))).sort();
+    const current = camFilterSel.value;
+    camFilterSel.innerHTML = '<option value="all">Tất cả camera</option>' +
+      cams.map(c=>`<option value="${c}">${c}</option>`).join('');
+    if(cams.includes(current)) camFilterSel.value = current;
+    $('statCams').textContent = cams.length;
+  }
+
+  function updateStats(){
+    $('statTotal').textContent = state.events.length;
+    $('statAlerts').textContent = state.events.filter(e=>severityOf(e)==='alert').length;
+    updateCamFilterOptions();
+  }
+
+  function rowHTML(ev, isNew){
+    const sev = severityOf(ev);
+    const sevLabel = sev==='alert' ? 'NGÃ' : (sev==='warn' ? 'CẢNH BÁO' : (ev.event_type||ev.event||'event'));
+    const rid = 'row_'+Math.random().toString(36).slice(2);
+    return `<div class="row sev-${sev} ${isNew?'flash':''}">
+      <div class="row-top">
+        <div class="row-main">
+          <span class="time mono">${fmtTime(getTs(ev))}</span>
+          <span class="cam-badge">${ev.cam_id||'—'}</span>
+          <span class="type-badge ${sev}">${sevLabel}</span>
+        </div>
+        <div>
+          <button class="play-clip" data-id="${escapeHtml(String(idOf(ev)))}">▶ xem clip 10s</button>
+          <button class="toggle-json" data-target="${rid}">xem raw JSON</button>
+        </div>
+      </div>
+      <pre class="json mono" id="${rid}">${escapeHtml(JSON.stringify(ev,null,2))}</pre>
+    </div>`;
+  }
+  function escapeHtml(s){
+    return s.replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  }
+
+  function render(){
+    const filtered = state.camFilter==='all' ? state.events : state.events.filter(e=>e.cam_id===state.camFilter);
+    if(filtered.length===0){
+      feed.innerHTML=''; feed.appendChild(emptyState);
+      emptyState.textContent = state.events.length ? 'Không có sự kiện nào khớp bộ lọc camera hiện tại.' : emptyState.textContent;
+      return;
+    }
+    feed.innerHTML = filtered.map(ev=>rowHTML(ev, ev.__isNew)).join('');
+    feed.querySelectorAll('.toggle-json').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const pre = document.getElementById(btn.dataset.target);
+        pre.classList.toggle('open');
+        btn.textContent = pre.classList.contains('open') ? 'ẩn raw JSON' : 'xem raw JSON';
+      });
+    });
+    feed.querySelectorAll('.play-clip').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const ev = state.events.find(e=> String(idOf(e))===btn.dataset.id);
+        if(ev) openClipModal(ev);
+      });
+    });
+    state.events.forEach(e=> e.__isNew=false);
+  }
+
+  function mergeIncoming(list){
+    let newCount = 0;
+    list.forEach(ev=>{
+      const id = idOf(ev);
+      if(!state.seenIds.has(id)){
+        state.seenIds.add(id);
+        ev.__isNew = true;
+        state.events.unshift(ev);
+        newCount++;
+        if(severityOf(ev)!=='info') notifyBrowser(ev);
+      }
+    });
+    if(state.events.length>300) state.events = state.events.slice(0,300);
+    if(newCount>0){ updateStats(); render(); }
+  }
+
+  function extractList(data){
+    if(Array.isArray(data)) return data;
+    if(data && Array.isArray(data.items)) return data.items;
+    if(data && Array.isArray(data.events)) return data.events;
+    if(data && Array.isArray(data.results)) return data.results;
+    if(data && typeof data==='object') return [data];
+    return [];
+  }
+
+  async function poll(){
+    if(state.paused) return;
+    try{
+      const url = state.apiBase.replace(/\/$/,'') + state.eventsPath;
+      const headers = {'Accept':'application/json'};
+      if(state.token) headers['Authorization'] = 'Bearer '+state.token;
+      const res = await fetch(url, {headers});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const data = await res.json();
+      mergeIncoming(extractList(data));
+      setStatus('ok', 'Đã kết nối');
+      state.connected = true;
+      $('statLast').textContent = new Date().toLocaleTimeString('vi-VN');
+    }catch(e){
+      setStatus('err', 'Lỗi: '+e.message);
+      state.connected = false;
+    }
+  }
+
+  function schedulePulse(){
+    document.getElementById('headerPulse').querySelector('.pulse-ring').style.animationDuration = Math.max(state.pollSec,1)+'s';
+  }
+
+  function startPolling(){
+    stopPolling();
+    schedulePulse();
+    poll();
+    state.timer = setInterval(poll, state.pollSec*1000);
+  }
+  function stopPolling(){
+    if(state.timer) clearInterval(state.timer);
+    state.timer = null;
+  }
+
+  $('connectBtn').addEventListener('click', ()=>{
+    state.apiBase = $('apiBase').value.trim();
+    state.eventsPath = $('eventsPath').value.trim() || '/api/events';
+    state.token = $('token').value.trim();
+    state.pollSec = Math.max(parseFloat($('pollInterval').value)||4, 1);
+    if(!state.apiBase){ setStatus('err','Chưa nhập API Base URL'); return; }
+    if('Notification' in window && Notification.permission==='default'){
+      Notification.requestPermission();
+    }
+    setStatus('idle','Đang kết nối…');
+    startPolling();
+  });
+
+  $('stopBtn').addEventListener('click', ()=>{
+    stopPolling();
+    setStatus('idle','Đã dừng');
+  });
+
+  $('pauseBtn').addEventListener('click', ()=>{
+    state.paused = !state.paused;
+    $('pauseBtn').textContent = state.paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
+    $('pauseBtn').classList.toggle('on', state.paused);
+  });
+
+  $('soundBtn').addEventListener('click', ()=>{
+    state.soundOn = !state.soundOn;
+    $('soundBtn').textContent = '🔊 Âm thanh: ' + (state.soundOn?'Bật':'Tắt');
+    $('soundBtn').classList.toggle('on', state.soundOn);
+    if(state.soundOn) beep();
+  });
+
+  $('clearBtn').addEventListener('click', ()=>{
+    state.events = []; state.seenIds.clear();
+    updateStats(); render();
+  });
+
+  camFilterSel.addEventListener('change', ()=>{
+    state.camFilter = camFilterSel.value;
+    render();
+  });
+
+  $('fakeEventBtn').addEventListener('click', ()=>{
+    const cams = ['cam_1','cam_2'];
+    const types = ['fall_candidate','standing','sitting','camera_not_found','event_received'];
+    const hasClip = Math.random() > 0.4;
+    const ev = {
+      event_id: 'test-'+Math.random().toString(36).slice(2,10),
+      cam_id: cams[Math.floor(Math.random()*cams.length)],
+      event_type: types[Math.floor(Math.random()*types.length)],
+      level: Math.random()>0.7 ? 'warning' : 'info',
+      timestamp: new Date().toISOString(),
+      logger: 'test.local'
+    };
+    if(hasClip){
+      ev.clip_url = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    }
+    mergeIncoming([ev]);
+  });
+
+  configPanel.classList.add('open');
+  updateStats();
+})();
+</script>
+
+</body>
+</html>

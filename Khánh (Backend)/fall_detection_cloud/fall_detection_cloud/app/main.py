@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -47,6 +48,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.PROJECT_NAME, version="2.0.0", lifespan=lifespan)
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
+
+# Mount static files for video clips
+app.mount("/clips", StaticFiles(directory="/app/clips"), name="clips")
 
 
 # ---- Error format chuẩn hóa (contract v2 mục 10) ----

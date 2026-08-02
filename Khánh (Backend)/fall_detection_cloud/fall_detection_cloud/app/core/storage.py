@@ -85,19 +85,19 @@ def upload_clip(frames: list[bytes], key_prefix: str = "clips") -> str | None:
     client = _get_client()
     if client is None or not frames:
         return None
-    
+
     # Tạo ZIP file chứa 6 frames
     import io
     import zipfile
-    
+
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         for i, frame in enumerate(frames):
             zip_file.writestr(f"frame_{i:03d}.jpg", frame)
-    
+
     zip_data = zip_buffer.getvalue()
     name = f"{key_prefix}/{uuid.uuid4().hex}.zip"
-    
+
     try:
         client.put_object(
             settings.MINIO_BUCKET,
@@ -115,3 +115,33 @@ def upload_clip(frames: list[bytes], key_prefix: str = "clips") -> str | None:
         f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET}"
     )
     return f"{base.rstrip('/')}/{name}"
+
+
+def get_jpeg(url: str) -> bytes | None:
+    """Download JPEG từ MinIO dựa trên URL, trả về bytes hoặc None nếu lỗi."""
+    client = _get_client()
+    if client is None:
+        return None
+
+    try:
+        # Extract key từ URL: http://localhost:9000/bucket/snapshots/xxx.jpg -> snapshots/xxx.jpg
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        path = parsed.path.lstrip('/')
+        # path format: bucket/key_prefix/filename.jpg
+        parts = path.split('/', 1)
+        if len(parts) < 2:
+            logger.warning("URL MinIO không hợp lệ: %s", url)
+            return None
+
+        key = parts[1]  # Lấy phần sau bucket name
+
+        response = client.get_object(settings.MINIO_BUCKET, key)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        return data
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Download từ MinIO thất bại: %s", exc)
+        return None

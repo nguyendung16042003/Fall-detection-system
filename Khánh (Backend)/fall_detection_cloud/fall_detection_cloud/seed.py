@@ -87,7 +87,7 @@ def seed_data() -> None:
                 .first()
                 is None
             ):
-                db.add(CameraRule(camera_id=camera.id))
+                db.add(CameraRule(camera_id=camera.id, enable_vlm_verify=True))
 
             # Một sự kiện mẫu cho mỗi camera
             if (

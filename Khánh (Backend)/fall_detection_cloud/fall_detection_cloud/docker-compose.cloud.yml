@@ -1,5 +1,3 @@
-version: '4.74.0'
-
 services:
   # 1. Cơ sở dữ liệu PostgreSQL
   db:

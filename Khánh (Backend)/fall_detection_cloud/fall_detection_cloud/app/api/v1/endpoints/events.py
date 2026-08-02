@@ -8,12 +8,14 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Response,
     status,
 )
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
 from app.core.database import SessionLocal, get_db
+from app.core.storage import get_jpeg
 from app.models.camera import Camera
 from app.models.event import Event
 from app.models.user import User
@@ -168,3 +170,33 @@ def get_event(
             detail="Sự kiện không tồn tại",
         )
     return to_event_out(event)
+
+
+@router.get("/{event_id}/snapshot")
+def get_event_snapshot(
+    event_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Response:
+    """Serve ảnh snapshot từ MinIO qua backend API (tránh vấn đề localhost qua Ngrok)."""
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sự kiện không tồn tại",
+        )
+
+    if not event.image_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sự kiện không có snapshot",
+        )
+
+    image_bytes = get_jpeg(event.image_url)
+    if image_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể tải ảnh từ MinIO",
+        )
+
+    return Response(content=image_bytes, media_type="image/jpeg")

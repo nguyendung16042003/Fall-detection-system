@@ -26,3 +26,4 @@ venv/
 .ipynb_checkpoints/
 Khánh (Backend)/fall_detection_cloud/fall_detection_cloud/.env.example
 *.example
+*.example

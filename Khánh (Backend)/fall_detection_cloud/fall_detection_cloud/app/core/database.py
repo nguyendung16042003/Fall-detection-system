@@ -5,11 +5,14 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
+DB_POOL_SIZE = 5  # Minimum connections in pool
+DB_MAX_OVERFLOW = 15  # Additional connections beyond pool_size (total max = 20)
+
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=5,  # Minimum connections in pool
-    max_overflow=15,  # Additional connections beyond pool_size (total max = 20)
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
     pool_recycle=3600,  # Recycle connections after 1 hour
     echo=False,
 )

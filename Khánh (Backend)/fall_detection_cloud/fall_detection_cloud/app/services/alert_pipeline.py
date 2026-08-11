@@ -16,14 +16,16 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.storage import upload_clip
 from app.models.alert import Alert
 from app.models.camera_rule import CameraRule
 from app.models.event import Event
+from app.models.telemetry import ConfidenceLog
 from app.models.user_device import UserDevice
 from app.services import vlm
 from app.services.notifications import fcm, telegram
-from app.services.dedup import get_deduplicator, find_nearby_events, merge_events_metadata
-from app.core.storage import upload_clip
+from app.services.dedup import acquire_dedup_lock, compute_lock_key
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +84,6 @@ def run_pipeline(
     camera_name = event.camera.name if event.camera else None
 
     # 0. Dedup multi-camera events với Postgres advisory lock để tránh race condition
-    from app.services.dedup import compute_lock_key, acquire_dedup_lock
     from datetime import timedelta
     
     lock_key = compute_lock_key(event.timestamp_utc, event.camera_id)
@@ -154,6 +155,26 @@ def run_pipeline(
         if vlm_res.error:
             result.notes.append(f"VLM error: {vlm_res.error}")
 
+        # MLOps: ghi log suy luận VLM (model, latency, verdict) để phân tích
+        # chất lượng model và chọn mẫu cho tái huấn luyện.
+        db.add(
+            ConfidenceLog(
+                event_id=event.id,
+                model_version=settings.GEMINI_MODEL,
+                inference_latency_ms=vlm_res.latency_ms,
+                environment_metadata={
+                    "dry_run": vlm_res.dry_run,
+                    "verdict": vlm_res.verdict,
+                    "error": vlm_res.error,
+                },
+                is_flagged_for_retrain=(
+                    vlm_res.verdict == vlm.VERDICT_UNCERTAIN
+                    or vlm_res.error is not None
+                ),
+            )
+        )
+        db.commit()
+
         # 2. Giảm báo động giả: VLM khẳng định không ngã -> bỏ qua
         if vlm_res.verdict == vlm.VERDICT_NOT_FALL:
             event.status = "false_positive"
@@ -204,7 +225,9 @@ def run_pipeline(
         data=data,
     )
     result.fcm_sent = fcm_res.sent
-    alert.fcm_sent = bool(fcm_res.sent) or fcm_res.dry_run
+    # fcm_sent chỉ True khi thực sự gửi được (không tính dry-run) để không
+    # gây hiểu nhầm khi đọc dữ liệu — xem PipelineResult.notes để biết dry-run.
+    alert.fcm_sent = bool(fcm_res.sent)
     db.add(alert)
     db.commit()
     if fcm_res.dry_run:

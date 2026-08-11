@@ -7,7 +7,7 @@ for Kubernetes/Docker health checks and orchestration systems.
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 
-from app.core.database import engine
+from app.core.database import DB_MAX_OVERFLOW, engine
 from app.core.logging_config import get_logger
 from app.services.mqtt_consumer import consumer
 
@@ -68,11 +68,10 @@ async def ready(response: Response) -> dict:
         pool = engine.pool
         pool_size = pool.size()
         pool_overflow = pool.overflow()
-        max_overflow = engine.max_overflow
-        checks["pool_usage"] = f"{pool_size}+{pool_overflow}/{pool_size + max_overflow}"
-        
+        checks["pool_usage"] = f"{pool_size}+{pool_overflow}/{pool_size + DB_MAX_OVERFLOW}"
+
         # Warn if pool is saturated
-        if pool_size + pool_overflow >= pool_size + max_overflow:
+        if pool_overflow >= DB_MAX_OVERFLOW:
             logger.warning("health_check_pool_saturated", pool_size=pool_size, pool_overflow=pool_overflow)
     except Exception as e:
         checks["pool_usage"] = f"fail: {str(e)}"

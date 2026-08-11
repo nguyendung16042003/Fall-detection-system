@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -49,8 +50,11 @@ app = FastAPI(title=settings.PROJECT_NAME, version="2.0.0", lifespan=lifespan)
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
-# Mount static files for video clips
-app.mount("/clips", StaticFiles(directory="/app/clips"), name="clips")
+# Mount static files for video clips. Đường dẫn tương đối để chạy được cả
+# trong Docker (WORKDIR /app) lẫn trực tiếp trên host từ thư mục gốc repo.
+_CLIPS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "clips")
+os.makedirs(_CLIPS_DIR, exist_ok=True)
+app.mount("/clips", StaticFiles(directory=_CLIPS_DIR), name="clips")
 
 
 # ---- Error format chuẩn hóa (contract v2 mục 10) ----

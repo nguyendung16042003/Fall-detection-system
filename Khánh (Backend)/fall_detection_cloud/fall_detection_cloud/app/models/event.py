@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -54,8 +55,10 @@ class Event(Base):
     vlm_reason = Column(String(1000))
     image_url = Column(String(500))
     clip_url = Column(String(500))
-    # status: pending | confirmed | false_positive
+    # status: pending | confirmed | false_positive | merged
     status = Column(String(20), default="pending", nullable=False)
+    # Ghi chú vận hành (vd: dấu vết gộp dedup multi-camera)
+    note = Column(Text)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

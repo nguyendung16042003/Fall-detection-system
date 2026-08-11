@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS events (
     image_url            VARCHAR(500),
     clip_url             VARCHAR(500),
     status               VARCHAR(20) NOT NULL DEFAULT 'pending',
+    note                 TEXT,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ix_events_camera_id ON events(camera_id);

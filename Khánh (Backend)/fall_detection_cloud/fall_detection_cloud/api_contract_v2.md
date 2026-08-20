@@ -168,10 +168,17 @@ Danh sách tất cả camera.
     "confidence": 0.95,
     "reason": "Person transitioned from standing to lying in 1.8s"
   },
-  "clip_url": "https://<minio-presigned>/clips/event_42.mp4",
+  "snapshot_url": "https://<minio>/snapshots/xxx.jpg",
+  "images": [
+    { "index": 0, "offset_ms": -2500, "url": "/api/events/a1b2c3d4-.../images/0" },
+    { "index": 1, "offset_ms": -2000, "url": "/api/events/a1b2c3d4-.../images/1" },
+    { "index": 5, "offset_ms": 0,     "url": "/api/events/a1b2c3d4-.../images/5" }
+  ],
   "created_at": "2026-06-15T10:30:03Z"
 }
 ```
+
+`images`: tối đa 6 ảnh bằng chứng (frame `offset_ms` từ Edge, sắp tăng dần), mỗi phần tử trỏ tới đường dẫn proxy `GET /api/events/{event_id}/images/{index}` (trả JPEG bytes, cần Bearer token) — không phải URL MinIO trực tiếp, vì client có thể truy cập qua ngrok/domain khác không với tới MinIO nội bộ được. Không còn `clip_url` trong response (bỏ tính năng xem video bằng chứng).
 
 **Field `status`:** `pending` | `confirmed` | `false_positive`
 
@@ -201,6 +208,10 @@ Danh sách tất cả camera.
 
 ### GET `/api/events/{event_id}`
 **Response 200:** full event object | `404`
+
+### GET `/api/events/{event_id}/images/{index}`
+`index` từ 0-5, khớp với `index` trong `images` của event object.  
+**Response 200:** JPEG bytes (`image/jpeg`) | `404` không có ảnh tại vị trí này | `500` lỗi tải từ MinIO
 
 ### POST `/api/events`
 REST fallback — dùng khi MQTT lỗi hoặc Khánh bơm data test cho Duy.  

@@ -14,6 +14,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
+from app.core.config import settings
 from app.core.database import SessionLocal, get_db
 from app.core.storage import get_jpeg
 from app.models.camera import Camera
@@ -23,6 +24,7 @@ from app.schemas.event import (
     DetectionOut,
     EventCreate,
     EventCreateResponse,
+    EventImageOut,
     EventListResponse,
     EventOut,
     VLMResultOut,
@@ -64,6 +66,16 @@ def to_event_out(event: Event) -> EventOut:
             reason=event.vlm_reason,
         )
 
+    images = [
+        EventImageOut(
+            index=item["index"],
+            offset_ms=item.get("offset_ms"),
+            url=f"{settings.API_PREFIX}/events/{event.event_id}/images/{item['index']}",
+        )
+        for item in (event.image_urls or [])
+        if item and item.get("url")
+    ]
+
     return EventOut(
         id=event.id,
         event_id=event.event_id,
@@ -78,8 +90,8 @@ def to_event_out(event: Event) -> EventOut:
             bbox_xyxy=bbox_xyxy,
         ),
         vlm_result=vlm_result,
-        clip_url=event.clip_url,
         snapshot_url=event.image_url,
+        images=images,
         created_at=event.created_at,
     )
 
@@ -193,6 +205,45 @@ def get_event_snapshot(
         )
 
     image_bytes = get_jpeg(event.image_url)
+    if image_bytes is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể tải ảnh từ MinIO",
+        )
+
+    return Response(content=image_bytes, media_type="image/jpeg")
+
+
+@router.get("/{event_id}/images/{index}")
+def get_event_image(
+    event_id: UUID,
+    index: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_active_user),
+) -> Response:
+    """Serve 1 trong 6 ảnh bằng chứng từ MinIO qua backend (tránh vấn đề localhost qua Ngrok)."""
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+    if event is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sự kiện không tồn tại",
+        )
+
+    entry = next(
+        (
+            item
+            for item in (event.image_urls or [])
+            if item and item.get("index") == index and item.get("url")
+        ),
+        None,
+    )
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không có ảnh tại vị trí này",
+        )
+
+    image_bytes = get_jpeg(entry["url"])
     if image_bytes is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

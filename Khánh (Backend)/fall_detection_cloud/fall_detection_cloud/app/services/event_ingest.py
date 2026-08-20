@@ -37,26 +37,40 @@ def _decode_trigger_frame(data: EventCreate) -> bytes | None:
         return None
 
 
-def _decode_all_frames(data: EventCreate) -> list[bytes] | None:
-    """Giải mã tất cả 6 frame từ payload cho VLM temporal analysis."""
+def _decode_all_frames_with_offsets(
+    data: EventCreate,
+) -> list[tuple[int, bytes]] | None:
+    """Giải mã 6 frame kèm offset_ms, sắp theo offset_ms tăng dần."""
     if not data.frames or len(data.frames) != 6:
-        logger.warning("Cần đúng 6 frame cho VLM, nhận được %d", len(data.frames) if data.frames else 0)
+        logger.warning(
+            "Cần đúng 6 frame để lưu ảnh bằng chứng, nhận được %d",
+            len(data.frames) if data.frames else 0,
+        )
         return None
-    
-    frames = []
+
+    result: list[tuple[int, bytes]] = []
     for frame in sorted(data.frames, key=lambda f: f.offset_ms):
         try:
-            frame_bytes = base64.b64decode(frame.jpeg_b64)
-            frames.append(frame_bytes)
+            result.append((frame.offset_ms, base64.b64decode(frame.jpeg_b64)))
         except (binascii.Error, ValueError) as exc:
-            logger.warning("Frame base64 không hợp lệ tại offset_ms=%d: %s", frame.offset_ms, exc)
+            logger.warning(
+                "Frame base64 không hợp lệ tại offset_ms=%d: %s",
+                frame.offset_ms,
+                exc,
+            )
             return None
-    
-    if len(frames) != 6:
-        logger.warning("Giải mã được %d/6 frame", len(frames))
+
+    if len(result) != 6:
+        logger.warning("Giải mã được %d/6 frame", len(result))
         return None
-    
-    return frames
+
+    return result
+
+
+def _decode_all_frames(data: EventCreate) -> list[bytes] | None:
+    """Giải mã tất cả 6 frame từ payload cho VLM temporal analysis."""
+    pairs = _decode_all_frames_with_offsets(data)
+    return [frame_bytes for _, frame_bytes in pairs] if pairs else None
 
 
 def ingest_event(
@@ -82,8 +96,25 @@ def ingest_event(
         bbox_json = {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
 
     frame_bytes = _decode_trigger_frame(data)
-    all_frames = _decode_all_frames(data)
+    all_frames_with_offsets = _decode_all_frames_with_offsets(data)
+    all_frames = (
+        [b for _, b in all_frames_with_offsets] if all_frames_with_offsets else None
+    )
     image_url = upload_jpeg(frame_bytes) if frame_bytes else None
+
+    image_urls_json = None
+    if all_frames_with_offsets:
+        entries = []
+        for idx, (offset_ms, frame_data) in enumerate(all_frames_with_offsets):
+            # offset_ms==0 là frame trigger đã upload ở trên -> tái dùng URL,
+            # tránh upload trùng cùng 1 ảnh lên MinIO 2 lần.
+            url = (
+                image_url
+                if (offset_ms == 0 and image_url)
+                else upload_jpeg(frame_data)
+            )
+            entries.append({"index": idx, "offset_ms": offset_ms, "url": url})
+        image_urls_json = entries
 
     event = Event(
         event_id=event_uuid or uuid.uuid4(),
@@ -100,6 +131,7 @@ def ingest_event(
         rule_trigger=data.rule.trigger if data.rule else None,
         transition_ms=data.rule.transition_ms if data.rule else None,
         image_url=image_url,
+        image_urls=image_urls_json,
         clip_url=data.clip_url,  # For manual testing purposes
         status=data.status or "pending",
     )

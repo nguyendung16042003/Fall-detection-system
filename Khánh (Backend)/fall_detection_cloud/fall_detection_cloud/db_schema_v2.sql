@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS events (
     vlm_confidence       DOUBLE PRECISION,
     vlm_reason           VARCHAR(1000),
     image_url            VARCHAR(500),
+    image_urls           JSONB,
     clip_url             VARCHAR(500),
     status               VARCHAR(20) NOT NULL DEFAULT 'pending',
     note                 TEXT,

@@ -93,6 +93,14 @@ class VLMResultOut(BaseModel):
     reason: str | None = None
 
 
+class EventImageOut(BaseModel):
+    """1 trong 6 ảnh bằng chứng, url là đường dẫn proxy qua backend."""
+
+    index: int
+    offset_ms: int | None = None
+    url: str
+
+
 class EventOut(BaseModel):
     """Event object đầy đủ (contract v2 mục 3)."""
 
@@ -105,8 +113,8 @@ class EventOut(BaseModel):
     status: str
     detection: DetectionOut
     vlm_result: VLMResultOut | None = None
-    clip_url: str | None = None
     snapshot_url: str | None = None
+    images: list[EventImageOut] = Field(default_factory=list)
     created_at: datetime
 
 

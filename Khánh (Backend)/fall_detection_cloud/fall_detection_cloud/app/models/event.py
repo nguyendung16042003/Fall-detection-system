@@ -54,6 +54,8 @@ class Event(Base):
     vlm_confidence = Column(Float)
     vlm_reason = Column(String(1000))
     image_url = Column(String(500))
+    # 6 ảnh bằng chứng: [{"index": int, "offset_ms": int, "url": str}, ...]
+    image_urls = Column(JSONB)
     clip_url = Column(String(500))
     # status: pending | confirmed | false_positive | merged
     status = Column(String(20), default="pending", nullable=False)

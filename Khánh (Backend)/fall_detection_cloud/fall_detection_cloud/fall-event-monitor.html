@@ -166,32 +166,44 @@
   }
   pre.json.open{display:block;}
 
-  .play-clip{font-size:11px; color:var(--accent-focus); background:none; border:none; cursor:pointer; padding:2px 4px; font-weight:600;}
-  .play-clip:hover{color:var(--accent-ok);}
+  .thumb-row{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .thumb{
+    width:56px; height:42px; border-radius:6px; border:1px solid var(--border);
+    background:var(--panel-2); object-fit:cover; cursor:pointer; display:block;
+  }
+  .thumb:hover{border-color:var(--accent-focus);}
+  .thumb-empty{
+    width:56px; height:42px; border-radius:6px; border:1px dashed var(--border);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-muted); font-size:10px;
+  }
+  .thumb-badge{font-size:11px; color:var(--text-muted); padding:2px 4px;}
 
-  .clip-modal-overlay{
+  .lightbox-overlay{
     position:fixed; inset:0; background:rgba(4,6,10,0.82);
     display:none; align-items:center; justify-content:center;
     z-index:100; padding:20px;
   }
-  .clip-modal-overlay.open{display:flex;}
-  .clip-modal{
+  .lightbox-overlay.open{display:flex;}
+  .lightbox{
     background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
-    max-width:640px; width:100%; overflow:hidden;
+    max-width:760px; width:100%; overflow:hidden;
   }
-  .clip-modal-header{
+  .lightbox-header{
     display:flex; align-items:center; justify-content:space-between;
     padding:12px 16px; border-bottom:1px solid var(--border);
   }
-  .clip-modal-header .titles{display:flex; flex-direction:column; gap:2px;}
-  .clip-modal-header .title{font-size:13px; font-weight:600;}
-  .clip-modal-header .sub{font-size:11px; color:var(--text-muted);}
-  .clip-modal-close{background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:2px 8px; line-height:1;}
-  .clip-modal-close:hover{color:var(--accent-alert);}
-  .clip-modal-body{padding:14px 16px;}
-  .clip-modal-body video{width:100%; max-height:60vh; border-radius:7px; background:#000; display:block;}
-  .clip-fallback{padding:34px 12px; text-align:center; color:var(--text-muted); font-size:13px; line-height:1.6;}
-  .clip-fallback .mono{display:block; margin-top:10px; font-size:11px; word-break:break-all; color:var(--text-muted);}
+  .lightbox-header .titles{display:flex; flex-direction:column; gap:2px;}
+  .lightbox-header .title{font-size:13px; font-weight:600;}
+  .lightbox-header .sub{font-size:11px; color:var(--text-muted);}
+  .lightbox-close{background:none; border:none; color:var(--text-muted); font-size:18px; cursor:pointer; padding:2px 8px; line-height:1;}
+  .lightbox-close:hover{color:var(--accent-alert);}
+  .lightbox-body{padding:14px 16px;}
+  .lightbox-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .lightbox-grid img{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:7px; background:#000; cursor:pointer; border:1px solid var(--border);}
+  .lightbox-main{margin-top:10px; text-align:center;}
+  .lightbox-main img{max-width:100%; max-height:50vh; border-radius:7px; background:#000;}
+  .lightbox-fallback{padding:34px 12px; text-align:center; color:var(--text-muted); font-size:13px; line-height:1.6;}
 
   footer{text-align:center; color:var(--text-muted); font-size:11px; padding:20px 0 0;}
 
@@ -247,7 +259,7 @@
     <div class="field-grid">
       <div class="field full">
         <label>Địa chỉ máy chạy backend (dùng chung cho đăng nhập lẫn theo dõi sự kiện), ví dụ http://192.168.1.50:8000</label>
-        <input id="apiBase" type="text" placeholder="http://<ip-máy-khánh>:8000">
+        <input id="apiBase" type="text" placeholder="http://<ip-máy-khánh>:8000" value="https://judicial-operation-pastrami.ngrok-free.dev">
       </div>
     </div>
 
@@ -379,16 +391,16 @@
   <footer>Dữ liệu chỉ lưu tạm trên trình duyệt trong phiên này — tải lại trang sẽ mất danh sách.</footer>
 </main>
 
-<div class="clip-modal-overlay" id="clipModal">
-  <div class="clip-modal">
-    <div class="clip-modal-header">
+<div class="lightbox-overlay" id="imageLightbox">
+  <div class="lightbox">
+    <div class="lightbox-header">
       <div class="titles">
-        <span class="title" id="clipModalTitle">Clip sự kiện</span>
-        <span class="sub mono" id="clipModalSub">–</span>
+        <span class="title" id="lightboxTitle">Ảnh bằng chứng</span>
+        <span class="sub mono" id="lightboxSub">–</span>
       </div>
-      <button class="clip-modal-close" id="clipModalClose">✕</button>
+      <button class="lightbox-close" id="lightboxClose">✕</button>
     </div>
-    <div class="clip-modal-body" id="clipModalBody"></div>
+    <div class="lightbox-body" id="lightboxBody"></div>
   </div>
 </div>
 
@@ -450,6 +462,7 @@
     $('authUserLabel').textContent = 'Đã đăng nhập: ' + (authState.email || '(không rõ username)');
     updateExpiryLabel();
     scheduleAutoRefresh();
+    if(typeof connectAndStart === 'function') connectAndStart();
     return true;
   }
 
@@ -572,13 +585,19 @@
   }
 
   function getTs(ev){
-    return ev.timestamp||ev.created_at||ev.event_time||ev.time||null;
+    return ev.timestamp_utc||ev.timestamp||ev.created_at||ev.event_time||ev.time||null;
   }
   function fmtTime(ts){
     if(!ts) return '–';
     const d = new Date(ts);
     if(isNaN(d.getTime())) return String(ts);
     return d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  function fmtDateTime(ts){
+    if(!ts) return '–';
+    const d = new Date(ts);
+    if(isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString('vi-VN');
   }
   function severityOf(ev){
     const type = (ev.event_type||ev.event||ev.class||'').toString().toLowerCase();
@@ -590,36 +609,74 @@
   function idOf(ev){
     return ev.event_id || ev.id || JSON.stringify(ev);
   }
-  function getClipUrl(ev){
-    return ev.clip_url || ev.clip || ev.video_url || ev.video_clip_url || null;
+  // ===== Gallery 6 ảnh bằng chứng (thay cho video clip) =====
+  function absoluteUrl(path){
+    return state.apiBase.replace(/\/$/,'') + path;
+  }
+  function getImageList(ev){
+    if(Array.isArray(ev.__fakeImages)) return ev.__fakeImages;
+    if(Array.isArray(ev.images) && ev.images.length){
+      return ev.images.map(img=> absoluteUrl(img.url));
+    }
+    if(ev.snapshot_url){
+      return [absoluteUrl(state.eventsPath + '/' + encodeURIComponent(String(idOf(ev))) + '/snapshot')];
+    }
+    return [];
+  }
+  function loadImageBlob(url){
+    const headers = {};
+    if(state.token && /^https?:/i.test(url)) headers['Authorization'] = 'Bearer '+state.token;
+    return fetch(url, {headers})
+      .then(res=>{ if(!res.ok) throw new Error('HTTP '+res.status); return res.blob(); })
+      .then(blob=> URL.createObjectURL(blob))
+      .catch(()=> null);
+  }
+  function hydrateThumbnails(){
+    state.events.forEach(ev=>{
+      if(ev.__thumbUrls || ev.__thumbLoading) return;
+      const urls = getImageList(ev);
+      if(!urls.length){ ev.__thumbUrls = []; return; }
+      ev.__thumbLoading = true;
+      Promise.all(urls.map(loadImageBlob)).then(blobs=>{
+        ev.__thumbLoading = false;
+        ev.__thumbUrls = blobs.filter(Boolean);
+        render();
+      });
+    });
   }
 
-  const clipModal = $('clipModal');
-  function clipFallbackHTML(url, msg){
-    return `<div class="clip-fallback">🎬 ${msg}${url ? '<span class="mono">'+escapeHtml(url)+'</span>' : ''}</div>`;
+  const imageLightbox = $('imageLightbox');
+  function lightboxFallbackHTML(){
+    return `<div class="lightbox-fallback">📷 Sự kiện này chưa có ảnh bằng chứng (có thể đang upload lên MinIO chưa xong, hoặc là event cũ trước khi tính năng lưu 6 ảnh được bật).</div>`;
   }
-  function openClipModal(ev){
-    $('clipModalTitle').textContent = (ev.cam_id||'—') + ' · ' + (ev.event_type||ev.event||'event');
-    $('clipModalSub').textContent = fmtTime(getTs(ev));
-    const body = $('clipModalBody');
-    const url = getClipUrl(ev);
-    if(url){
-      body.innerHTML = `<video src="${escapeHtml(url)}" controls autoplay loop playsinline></video>`;
-      body.querySelector('video').addEventListener('error', ()=>{
-        body.innerHTML = clipFallbackHTML(url, 'Không tải được video từ URL này (link có thể hết hạn, sai định dạng, hoặc bị CORS chặn).');
-      });
+  function openLightbox(ev, startIndex){
+    $('lightboxTitle').textContent = (ev.cam_id||'—') + ' · ' + (ev.event_type||ev.event||'event');
+    $('lightboxSub').textContent = 'Thời gian báo ngã: ' + fmtDateTime(getTs(ev));
+    const body = $('lightboxBody');
+    const blobs = ev.__thumbUrls || [];
+    if(!blobs.length){
+      body.innerHTML = lightboxFallbackHTML();
     }else{
-      body.innerHTML = clipFallbackHTML(null, 'Sự kiện này chưa có field clip_url/clip/video_url trong dữ liệu — có thể clip đang upload bất đồng bộ lên MinIO chưa xong, hoặc backend đặt tên field khác (bấm "xem raw JSON" để kiểm tra tên thật).');
+      const idx = (startIndex!=null && blobs[startIndex]) ? startIndex : 0;
+      body.innerHTML = `
+        <div class="lightbox-main"><img src="${blobs[idx]}" alt="Ảnh bằng chứng"></div>
+        <div class="lightbox-grid" style="margin-top:10px;">${blobs.map((src,i)=>`<img src="${src}" data-idx="${i}">`).join('')}</div>`;
+      body.querySelectorAll('.lightbox-grid img').forEach(img=>{
+        img.addEventListener('click', ()=>{
+          body.querySelector('.lightbox-main img').src = img.src;
+        });
+      });
     }
-    clipModal.classList.add('open');
+    imageLightbox.classList.add('open');
   }
-  function closeClipModal(){
-    clipModal.classList.remove('open');
-    $('clipModalBody').innerHTML = '';
+  function closeLightbox(){
+    imageLightbox.classList.remove('open');
+    $('lightboxBody').innerHTML = '';
   }
-  $('clipModalClose').addEventListener('click', closeClipModal);
-  clipModal.addEventListener('click', (e)=>{ if(e.target===clipModal) closeClipModal(); });
-  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeClipModal(); });
+  $('lightboxClose').addEventListener('click', closeLightbox);
+  imageLightbox.addEventListener('click', (e)=>{ if(e.target===imageLightbox) closeLightbox(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeLightbox(); });
+  // ===== Hết phần Gallery =====
 
   function updateCamFilterOptions(){
     const cams = Array.from(new Set(state.events.map(e=>e.cam_id).filter(Boolean))).sort();
@@ -636,6 +693,18 @@
     updateCamFilterOptions();
   }
 
+  function thumbRowHTML(ev){
+    const blobs = ev.__thumbUrls;
+    if(blobs && blobs.length){
+      return blobs.map((src,i)=>`<img class="thumb" src="${src}" data-idx="${i}" alt="Ảnh bằng chứng ${i+1}">`).join('');
+    }
+    if(blobs && blobs.length===0){
+      return `<span class="thumb-badge">Không có ảnh bằng chứng</span>`;
+    }
+    const count = Array.isArray(ev.images) && ev.images.length ? ev.images.length : (ev.snapshot_url ? 1 : 0);
+    if(count===0) return `<span class="thumb-badge">Không có ảnh bằng chứng</span>`;
+    return Array.from({length:count}).map(()=>`<span class="thumb-empty">…</span>`).join('');
+  }
   function rowHTML(ev, isNew){
     const sev = severityOf(ev);
     const sevLabel = sev==='alert' ? 'NGÃ' : (sev==='warn' ? 'CẢNH BÁO' : (ev.event_type||ev.event||'event'));
@@ -647,11 +716,9 @@
           <span class="cam-badge">${ev.cam_id||'—'}</span>
           <span class="type-badge ${sev}">${sevLabel}</span>
         </div>
-        <div>
-          <button class="play-clip" data-id="${escapeHtml(String(idOf(ev)))}">▶ xem clip 10s</button>
-          <button class="toggle-json" data-target="${rid}">xem raw JSON</button>
-        </div>
+        <button class="toggle-json" data-target="${rid}">xem raw JSON</button>
       </div>
+      <div class="thumb-row" data-id="${escapeHtml(String(idOf(ev)))}">${thumbRowHTML(ev)}</div>
       <pre class="json mono" id="${rid}">${escapeHtml(JSON.stringify(ev,null,2))}</pre>
     </div>`;
   }
@@ -674,13 +741,15 @@
         btn.textContent = pre.classList.contains('open') ? 'ẩn raw JSON' : 'xem raw JSON';
       });
     });
-    feed.querySelectorAll('.play-clip').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const ev = state.events.find(e=> String(idOf(e))===btn.dataset.id);
-        if(ev) openClipModal(ev);
+    feed.querySelectorAll('.thumb-row').forEach(row=>{
+      row.addEventListener('click', (e)=>{
+        if(!e.target.classList.contains('thumb')) return;
+        const ev = state.events.find(ev2=> String(idOf(ev2))===row.dataset.id);
+        if(ev) openLightbox(ev, Number(e.target.dataset.idx));
       });
     });
     state.events.forEach(e=> e.__isNew=false);
+    hydrateThumbnails();
   }
 
   function mergeIncoming(list){
@@ -742,18 +811,20 @@
     state.timer = null;
   }
 
-  $('connectBtn').addEventListener('click', ()=>{
+  function connectAndStart(){
     state.apiBase = $('apiBase').value.trim();
     state.eventsPath = $('eventsPath').value.trim() || '/api/events';
     state.token = $('token').value.trim();
     state.pollSec = Math.max(parseFloat($('pollInterval').value)||4, 1);
     if(!state.apiBase){ setStatus('err','Chưa nhập API Base URL'); return; }
+    if(!state.token){ setStatus('err','Chưa có token — đăng nhập trước khi kết nối'); return; }
     if('Notification' in window && Notification.permission==='default'){
       Notification.requestPermission();
     }
     setStatus('idle','Đang kết nối…');
     startPolling();
-  });
+  }
+  $('connectBtn').addEventListener('click', connectAndStart);
 
   $('stopBtn').addEventListener('click', ()=>{
     stopPolling();
@@ -774,6 +845,9 @@
   });
 
   $('clearBtn').addEventListener('click', ()=>{
+    state.events.forEach(ev=>{
+      (ev.__thumbUrls||[]).forEach(url=> URL.revokeObjectURL(url));
+    });
     state.events = []; state.seenIds.clear();
     updateStats(); render();
   });
@@ -786,17 +860,20 @@
   $('fakeEventBtn').addEventListener('click', ()=>{
     const cams = ['cam_1','cam_2'];
     const types = ['fall_candidate','standing','sitting','camera_not_found','event_received'];
-    const hasClip = Math.random() > 0.4;
+    const hasImages = Math.random() > 0.3;
     const ev = {
       event_id: 'test-'+Math.random().toString(36).slice(2,10),
       cam_id: cams[Math.floor(Math.random()*cams.length)],
       event_type: types[Math.floor(Math.random()*types.length)],
       level: Math.random()>0.7 ? 'warning' : 'info',
-      timestamp: new Date().toISOString(),
+      timestamp_utc: new Date().toISOString(),
       logger: 'test.local'
     };
-    if(hasClip){
-      ev.clip_url = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    if(hasImages){
+      const colors = ['#5B8DEF','#38D9A9','#F5A623','#FF5D5D','#9B7EDE','#4FD1C5'];
+      ev.__fakeImages = colors.map((c,i)=> 'data:image/svg+xml;utf8,' + encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120"><rect width="160" height="120" fill="${c}"/><text x="50%" y="50%" fill="#0A0E14" font-size="20" text-anchor="middle" dy=".3em">#${i+1}</text></svg>`
+      ));
     }
     mergeIncoming([ev]);
   });

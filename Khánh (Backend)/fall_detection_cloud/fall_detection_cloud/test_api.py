@@ -78,8 +78,7 @@ event_data = {
         "transition_ms": 1800,
         "window_ms": 2000
     },
-    "frames": [],
-    "clip_url": "http://localhost:8000/clips/source.mp4"
+    "frames": []
 }
 
 event_json = json.dumps(event_data).encode()
@@ -106,17 +105,16 @@ try:
     print("GET /api/events/{event_id} successful:")
     print(json.dumps(event_detail, indent=2))
     
-    # Check if clip_url field exists in response
+    # Check that clip_url is gone (evidence video removed) and images is present
     if 'clip_url' in event_detail:
-        print("✅ clip_url field exists in GET response")
-        print(f"clip_url value: {event_detail['clip_url']}")
-        # Verify the test clip_url was saved
-        if event_detail['clip_url'] == "http://localhost:8000/clips/source.mp4":
-            print("✅ clip_url value matches test video URL")
-        else:
-            print("⚠️  clip_url value does not match test video URL")
+        print("❌ clip_url field still present in GET response (should be removed)")
     else:
-        print("❌ clip_url field missing in GET response")
+        print("✅ clip_url field correctly removed from GET response")
+
+    if 'images' in event_detail and isinstance(event_detail['images'], list):
+        print(f"✅ images field exists in GET response ({len(event_detail['images'])} ảnh)")
+    else:
+        print("❌ images field missing in GET response")
 except Exception as e:
     print("GET /api/events/{event_id} failed:", e)
     sys.exit(1)

@@ -115,26 +115,32 @@ def classifier_bench_charts():
     plt.close(fig)
 
 
-def stock_vs_trained_chart():
+def round1_vs_trained_chart():
     # So sanh THAT (chay that, xem compare_classifier_default_vs_trained.py):
-    # YOLOv8n-cls GOC (pretrained ImageNet-1k, chua fine-tune) vs ban DANG
-    # DEPLOY (fine-tuned AFCL) -- do TREN CUNG 12,460 anh val v4_split_flat.
-    labels = ["Stock\n(not fine-tuned)", "Deployed\n(fine-tuned, AFCL)"]
-    acc = [0.0, 97.98]
-    colors = [GRAY, ORANGE]
+    # Round 1 (v2_split_flat cu, loss thuong, 120 epoch) vs ban DANG DEPLOY
+    # (fine-tuned AFCL, v4_split_flat) -- do TREN CUNG 12,460 anh val
+    # v4_split_flat (Round 1 chua tung thay bo data nay).
+    import numpy as np
+    classes = ["bend", "exercise", "lie", "sit", "stand", "Overall"]
+    round1 = [46.40, 86.32, 91.18, 88.41, 99.95, 85.73]
+    deployed = [95.82, 98.74, 97.49, 96.90, 99.64, 97.98]
 
-    fig, ax = plt.subplots(figsize=(4.6, 3.0), dpi=200)
-    bars = ax.bar(labels, acc, color=colors, width=0.5)
-    ax.set_ylabel("Top-1 accuracy on v4_split_flat val", fontsize=8.5)
-    ax.set_ylim(0, 112)
+    fig, ax = plt.subplots(figsize=(9.2, 2.3), dpi=200)
+    x = np.arange(len(classes))
+    w = 0.32
+    b1 = ax.bar(x - w / 2, round1, width=w, color=GRAY, label="Round 1 (old data, plain loss)")
+    b2 = ax.bar(x + w / 2, deployed, width=w, color=ORANGE, label="Deployed (fine-tuned, AFCL)")
+    ax.set_xticks(x); ax.set_xticklabels(classes, fontsize=9.5)
+    ax.set_ylim(0, 122)
+    ax.set_ylabel("Accuracy (%)", fontsize=9)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.tick_params(axis="x", labelsize=9)
-    ax.tick_params(axis="y", labelsize=8)
-    for b, v in zip(bars, acc):
-        ax.text(b.get_x() + b.get_width() / 2, v + 3, f"{v:.2f}%", ha="center",
-                fontsize=10, fontweight="bold", color=INK)
-    fig.tight_layout(pad=0.5)
-    fig.savefig(OUT / "chart_stock_vs_trained.png", transparent=True)
+    ax.legend(fontsize=8.5, frameon=False, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.22))
+    for bars in [b1, b2]:
+        for b in bars:
+            ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 3, f"{b.get_height():.1f}%",
+                    ha="center", fontsize=7.5, color=INK)
+    fig.tight_layout(pad=0.3)
+    fig.savefig(OUT / "chart_round1_vs_trained.png", transparent=True)
     plt.close(fig)
 
 

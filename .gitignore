@@ -1,26 +1,7 @@
-# Dataset
-Datasets/
-datasets/
-
-# YOLO models
-#*.pt
-
-# YOLO output
-#runs/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# VS Code
-.vscode/
-
-# Environment
-.env
-
-# Conda / venv
-venv/
-.venv/
-
-# Jupyter
-.ipynb_checkpoints/
+# Chi giu file code .py + .docx -- bo qua TOAN BO con lai (dataset, model,
+# video, csv, json, ...). Ap dung cho toan repo (nguoi dung xac nhan day la
+# .gitignore rieng cua GitHub Desktop ca nhan, khong anh huong thanh vien khac).
+*
+!*.py
+!*.docx
+!*/

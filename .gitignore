@@ -5,4 +5,5 @@
 !*.py
 !*.docx
 !*.example
+!*.md
 !*/

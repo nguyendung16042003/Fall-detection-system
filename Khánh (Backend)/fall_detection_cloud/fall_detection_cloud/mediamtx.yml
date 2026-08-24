@@ -1,0 +1,68 @@
+# MediaMTX Configuration cho Fall Detection System
+# Cấu hình để nhận RTSP stream từ Jetson và phát ra HLS cho mobile app
+
+# Global settings
+logLevel: info
+logDestinations: [stdout]
+readTimeout: 10s
+writeTimeout: 10s
+
+# RTSP server - nhận stream từ Jetson Nano
+rtsp:
+  enable: yes
+  protocols: [tcp]
+  rtspAddress: :8554
+  readBufferSize: 1048576  # 1MB
+  readUserAgent: "Jetson-Fall-Detection"
+
+# RTMP server (optional)
+rtmp:
+  enable: yes
+  rtmpAddress: :1935
+
+# HLS server - phát stream cho mobile app
+hls:
+  enable: yes
+  address: :8888
+  encryption: no
+  muxer:
+    segmentDuration: 1s  # Độ dài mỗi segment
+    segmentCount: 10     # Số segment giữ trong playlist
+    partitionDuration: 0.5s
+    maxSegmentCount: 30
+    targetLatency: 2s
+    targetLatencySegments: 2
+
+# WebRTC server (low latency alternative)
+webrtc:
+  enable: yes
+  address: :8889
+  iceServers:
+    - urls: [stun:stun.l.google.com:19302]
+
+# Paths configuration - mỗi camera có path riêng
+paths:
+  # Camera 01
+  cam_01:
+    source: rtsp://jetson-cam01:8554/cam_01
+    sourceOnDemand: no
+    sourceRedirect: no
+    
+  # Camera 02
+  cam_02:
+    source: rtsp://jetson-cam02:8554/cam_02
+    sourceOnDemand: no
+    sourceRedirect: no
+  
+  # Camera 03
+  cam_03:
+    source: rtsp://jetson-cam03:8554/cam_03
+    sourceOnDemand: no
+    sourceRedirect: no
+
+# API for control (optional)
+api: yes
+apiAddress: :9997
+
+# Metrics for monitoring (optional)
+pprof: no

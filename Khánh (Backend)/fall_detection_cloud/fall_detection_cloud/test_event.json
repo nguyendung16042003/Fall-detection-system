@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.2",
+  "event_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "cam_id": "cam_01",
+  "person_id": 1,
+  "timestamp_utc": "2026-07-19T10:20:00.123Z",
+  "event_type": "fall_candidate",
+  "detection": {
+    "class_before": "stand",
+    "final_class": "lie",
+    "confidence": 0.92,
+    "bbox_xyxy": [120, 80, 380, 420],
+    "frame_width": 1280,
+    "frame_height": 720
+  },
+  "rule": {
+    "version": "1.0",
+    "trigger": "stand_to_lie",
+    "transition_ms": 1800,
+    "window_ms": 2000
+  },
+  "frames": []
+}

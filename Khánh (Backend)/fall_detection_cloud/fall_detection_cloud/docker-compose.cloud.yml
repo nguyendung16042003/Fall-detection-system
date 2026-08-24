@@ -1,0 +1,90 @@
+services:
+  # 1. Cơ sở dữ liệu PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: fall_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_password}
+      POSTGRES_DB: ${POSTGRES_DB:-falldetection}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Cài đặt MỚI: khởi tạo bằng schema v2 (api_contract_v2)
+      - ./db_schema_v2.sql:/docker-entrypoint-initdb.d/db_schema_v2.sql
+
+  # 2. Bộ điều phối tin nhắn RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fall_mq
+    restart: always
+    ports:
+      - "5672:5672"   # AMQP
+      - "1883:1883"   # MQTT (Edge publish event/telemetry) - contract v2
+      - "15672:15672" # Web UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    volumes:
+      # Bật MQTT plugin (port 1883) cho Edge
+      - ./rabbitmq_enabled_plugins:/etc/rabbitmq/enabled_plugins
+
+  # 3. Kho lưu trữ đối tượng MinIO (Bổ sung mới) [1, 2]
+  minio:
+    image: minio/minio
+    container_name: fall_minio
+    restart: always
+    ports:
+      - "9000:9000"   # API lưu trữ
+      - "9001:9001"   # Giao diện quản lý (Console)
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password123}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  # 4. MediaMTX - Media Server cho HLS Live Streaming
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: fall_mediamtx
+    restart: always
+    ports:
+      - "8554:8554"   # RTSP (nhận stream từ Jetson)
+      - "8888:8888"   # HLS (phát ra cho mobile app)
+      - "8889:8889"   # WebRTC (low latency)
+      - "1935:1935"   # RTMP
+
+  # 5. Ứng dụng Backend FastAPI
+  backend:
+    build: .
+    container_name: fall_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app # Hỗ trợ hot-reload trong quá trình phát triển [2]
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      - MQTT_HOST=rabbitmq
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=${RABBITMQ_USER:-guest}
+      - MQTT_PASSWORD=${RABBITMQ_PASS:-guest}
+      - MQTT_ENABLED=true
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_PUBLIC_URL=http://localhost:9000/fall-events
+      - MEDIAMTX_BASE_URL=http://localhost:8888
+    depends_on:
+      - db
+      - rabbitmq
+      - minio
+      - mediamtx
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -2,8 +2,8 @@
 
 Capstone project (đồ án tốt nghiệp): phát hiện té ngã cho người già theo thời gian
 thực bằng **2 camera IP (RTSP)** chạy trên **Jetson Orin Nano 8GB**, xác minh lại
-event bằng **VLM (Gemini)** trước khi báo động, gửi cảnh báo tới **app di động**
-qua cloud backend. Đóng góp học thuật chính: kiến trúc xử lý đa camera giải 3 bài
+event bằng **VLM (Gemini)** trước khi báo động, gửi cảnh báo qua **push
+notification (FCM) và Telegram**. Đóng góp học thuật chính: kiến trúc xử lý đa camera giải 3 bài
 toán con — Re-Identification, Identity Association, Boundary Feature Fusion — cho
 phép hệ thống bám đúng danh tính và tư thế 1 người xuyên suốt 2 camera, kể cả khi
 họ ngã ngay tại vùng giao giữa 2 góc quay.
@@ -15,7 +15,6 @@ họ ngã ngay tại vùng giao giữa 2 góc quay.
 | **Tấn Dũng** | AI / Model — nghiên cứu, huấn luyện, benchmark 3 module Re-ID/Identity Association/Boundary Feature Fusion | `Tan Dung (AI)/` | `feature/ai` |
 | **Dũng** | Edge / Architecture (lead) — hạ tầng pipeline DeepStream trên Jetson, tích hợp toàn hệ thống, schema MQTT & API contract | `Dũng (Edge)/` | `feature/edge` |
 | **Khánh** | Cloud / Backend — FastAPI, MQTT consumer, VLM verify, notification (FCM/Telegram), REST API cho mobile | `Khánh (Web)/` | `feature/backend` |
-| **Duy** | Mobile App (Flutter) | *(chưa merge vào `main(to-nhất)`)* | `feature/mobile` |
 
 > Lưu ý: "Dũng" (Edge, lead kiến trúc/hạ tầng) và "Tấn Dũng" (AI/model) là **2 thành
 > viên khác nhau** trùng tên đầu — tài liệu trong `Dũng (Edge)/docs/` luôn phân biệt
@@ -55,35 +54,34 @@ Cloud Backend — FastAPI + PostgreSQL + MinIO + MediaMTX  (Khánh)
   MQTT consumer → lưu DB → VLM verify (Gemini, phân biệt "ngã" vs "nằm nghỉ")
   → tạo alert → push FCM + Telegram
   REST API (JWT) cho: auth, camera, event history, alert ack, telemetry, live HLS
-        │
-        ▼
-Mobile App (Flutter)  (Duy)
-  nhận push FCM, xem lịch sử event/alert, xem live HLS, quản lý camera
 ```
 
 ## Cấu trúc repo
 
-```
-Tan Dung (AI)/        Nghiên cứu + huấn luyện 3 module AI, report, slide, demo video
-                       → xem Tan Dung (AI)/README.md
-Dũng (Edge)/           Pipeline DeepStream chạy trên Jetson + tích hợp toàn hệ thống
-  src/                   pipeline.py, fall_detector.py, event_builder.py,
-                         mqtt_publisher.py, rolling_buffer.py, visual_dump.py,
-                         reid.py / identity_association.py / boundary_feature_fusion.py
-                         (port trực tiếp từ Tan Dung (AI)/Handoff_for_Edge/,
-                          giữ nguyên công thức toán, chỉ đổi cách chạy model
-                          sang TensRT/pyds cho tương thích Jetson)
-  tests/                 unit test thuần Python (không cần GPU/camera)
-  tools/                 mqtt_sub.py, compare_onnx_deepstream.py
-  docs/                  api_contract_v2.md, mqtt_schema_v2.json
-  cloud/                 Dockerfile/requirements cho phần backend chạy cạnh Edge
-Khánh (Web)/            Cloud backend FastAPI
-  fall_detection_cloud/fall_detection_cloud/
-    app/                   api/, core/, models/, schemas/, services/ (VLM, FCM,
-                            Telegram, MQTT consumer, alert pipeline)
-    alembic/               DB migrations
-    → xem Khánh (Web)/.../README.md để chạy local + đầy đủ API
-```
+### `Tan Dung (AI)/` — Tấn Dũng
+
+Nghiên cứu, huấn luyện, benchmark 3 module AI + report/slide/demo video.
+Xem **[Tan Dung (AI)/README.md](<Tan Dung (AI)/README.md>)** để biết chi tiết.
+
+### `Dũng (Edge)/` — Dũng
+
+| Path | Nội dung |
+|---|---|
+| `src/` | `pipeline.py`, `fall_detector.py`, `event_builder.py`, `mqtt_publisher.py`, `rolling_buffer.py`, `visual_dump.py` |
+| `src/reid.py`, `identity_association.py`, `boundary_feature_fusion.py` | Port trực tiếp từ `Tan Dung (AI)/Handoff_for_Edge/` — giữ nguyên công thức toán, chỉ đổi cách chạy model sang TensorRT/pyds cho tương thích Jetson |
+| `tests/` | Unit test thuần Python — không cần GPU/camera |
+| `tools/` | `mqtt_sub.py`, `compare_onnx_deepstream.py` |
+| `docs/` | `api_contract_v2.md`, `mqtt_schema_v2.json` |
+| `cloud/` | Dockerfile/requirements cho phần backend chạy cạnh Edge |
+
+### `Khánh (Web)/` — Khánh
+
+| Path | Nội dung |
+|---|---|
+| `fall_detection_cloud/fall_detection_cloud/app/` | `api/`, `core/`, `models/`, `schemas/`, `services/` (VLM, FCM, Telegram, MQTT consumer, alert pipeline) |
+| `fall_detection_cloud/fall_detection_cloud/alembic/` | DB migrations |
+
+Xem **[Khánh (Web)/.../README.md](<Khánh (Web)/fall_detection_cloud/fall_detection_cloud/README.md>)** để chạy local + đầy đủ API.
 
 ## Hạ tầng & công nghệ
 
@@ -96,7 +94,6 @@ Khánh (Web)/            Cloud backend FastAPI
 | Lưu trữ media | MinIO (snapshot/clip), MediaMTX (HLS live view) |
 | Xác minh event | Gemini (VLM) — phân loại "ngã thật" vs "nằm nghỉ" từ 6 ảnh quanh thời điểm trigger |
 | Notification | Firebase Cloud Messaging + Telegram Bot |
-| Mobile | Flutter |
 
 ## Trạng thái hiện tại (tóm tắt, xem chi tiết trong từng folder)
 
@@ -110,8 +107,6 @@ Khánh (Web)/            Cloud backend FastAPI
 - **Backend (Khánh)**: API contract v2 đầy đủ (auth, camera, event, alert, telemetry,
   live), trigger chain VLM → alert → FCM/Telegram chạy được ở chế độ dry-run khi
   chưa có credential thật.
-- **Mobile (Duy)**: đang phát triển trên `feature/mobile`, chưa merge vào
-  `main(to-nhất)`.
 
 ## Đọc thêm
 

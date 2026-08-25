@@ -1,7 +1,7 @@
 # Multi-Camera Fall Detection System on Edge Device with VLM Verification
 
 Capstone project (đồ án tốt nghiệp): phát hiện té ngã cho người già theo thời gian
-thực bằng **2 camera IP (RTSP)** chạy trên **Jetson Orin Nano 8GB**, xác minh lại
+thực bằng **2 camera IP (RTSP)** chạy trên **Jetson Nano 4GB**, xác minh lại
 event bằng **VLM (Gemini)** trước khi báo động, gửi cảnh báo qua **push
 notification (FCM) và Telegram**. Đóng góp học thuật chính: kiến trúc xử lý đa camera giải 3 bài
 toán con — Re-Identification, Identity Association, Boundary Feature Fusion — cho
@@ -26,9 +26,9 @@ họ ngã ngay tại vùng giao giữa 2 góc quay.
 2× camera IP (RTSP, Ezviz/Hikvision)
         │
         ▼
-Jetson Orin Nano 8GB — DeepStream 7.0  (Dũng - Edge)
+Jetson Nano 4GB — DeepStream  (Dũng - Edge)
   PGIE  YOLOv8n (person, 640px)
-  Tracker  NvSORT (thay ByteTrack — segfault trên DeepStream 7.0)
+  Tracker  NvSORT (thay ByteTrack — segfault trên DeepStream)
   SGIE  YOLOv8n-cls (6 lớp tư thế: bend/exercise/half_person/lie/sit/stand)
         │
         ├─ Re-Identification (OSNet_x0.25 KD, embedding 512-d)
@@ -109,7 +109,7 @@ Xem **[Khánh (Web)/.../README.md](<Khánh (Web)/fall_detection_cloud/fall_detec
 
 | Thành phần | Công nghệ |
 |---|---|
-| Edge inference | Jetson Orin Nano 8GB, JetPack 6.0, DeepStream 7.0, TensorRT 8.6.2, CUDA 12.2 |
+| Edge inference | Jetson Nano B01 4GB, JetPack 4.6, CUDA 10.2, TensorRT 8.2, DeepStream (bản tương thích JetPack 4.6) |
 | Camera | 2× IP camera RTSP (Ezviz CS-H6C/C6N hoặc Hikvision, tuỳ đợt lắp), qua NAT |
 | Message broker | RabbitMQ + MQTT plugin (chạy trên máy Khánh, Docker Compose) |
 | Backend | FastAPI, SQLAlchemy 2.0 + PostgreSQL, Alembic, JWT | 

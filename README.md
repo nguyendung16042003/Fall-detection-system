@@ -60,8 +60,30 @@ Cloud Backend — FastAPI + PostgreSQL + MinIO + MediaMTX  (Khánh)
 
 ### `Tan Dung (AI)/` — Tấn Dũng
 
-Nghiên cứu, huấn luyện, benchmark 3 module AI + report/slide/demo video.
-Xem **[Tan Dung (AI)/README.md](<Tan Dung (AI)/README.md>)** để biết chi tiết.
+Module AI/Computer-Vision cho đồ án, nghiên cứu + huấn luyện 3 bài toán con đa
+camera trên Jetson Nano 4GB: **Re-Identification**, **Identity Association**,
+**Boundary Feature Fusion**. Chỉ track source code + tài liệu viết (`.py`,
+`.docx`, `.md`) — dataset, trọng số model, video, ảnh sinh ra đều bị loại qua
+`.gitignore` để repo chung nhẹ.
+
+| Path | Nội dung |
+|---|---|
+| `Chạy xử lý toàn bộ hệ thống/Code/p1_reid/` | Re-Identification — huấn luyện distillation OSNet x0.25, so sánh baseline MSINet, export ONNX, script demo video |
+| `Chạy xử lý toàn bộ hệ thống/Code/p2_homography/` | Identity Association — hiệu chuẩn homography sàn + ghép Hungarian, fall-rule adapter |
+| `Chạy xử lý toàn bộ hệ thống/Code/p3_cross_camera/` | Boundary Feature Fusion — hợp nhất cross-camera attention, hiệu chuẩn, benchmark classifier nhẹ, export ONNX |
+| `Chạy xử lý toàn bộ hệ thống/Code/_archive_khong_dung/` | Code cũ/thử nghiệm đã bỏ, **không** thuộc hệ thống deploy cuối cùng |
+| `Chạy xử lý toàn bộ hệ thống/Report/` | `Report chính.docx`, `Script thuyết trình.docx`, `gen_diagrams.py` (sinh lại ảnh biểu đồ dùng trong slide/report) |
+| `Chạy xử lý toàn bộ hệ thống/Số liệu thống kê(- Copy)/` | Kết quả/số liệu thống kê dùng trong report |
+| `Chạy xử lý toàn bộ hệ thống/Video demo/`, `File Run Problem 1-3/`, `File Test đề phòng/` | Script quay demo + chạy test cho từng bài toán con |
+| `Coding/` | Không gian train/eval song song trước đó (Test, training, Evaluation, Pipeline, Benchmark) |
+| `Datasets/` | Script chuẩn bị/tải dataset (dữ liệu thật bị gitignore) |
+| `Handoff_for_Edge/` | Code pipeline + calib sẵn sàng deploy, bàn giao cho Edge — `1_Single_Camera_Pipeline/` và `2_Multi_Camera_Modules/` |
+| `Papers/` | Ghi chú các bài báo tham khảo (LFD-YOLO, PIFR) |
+| `docs/` | Bản báo cáo đầy đủ (docx) |
+
+Tài liệu đầy đủ: `Report chính.docx` (nguồn chuẩn cho mọi số liệu/luận điểm
+trong slide), slide `Fall Detection(Slide bản PowerPoint).pptx`, artifact
+deploy thật xem `Handoff_for_Edge/`.
 
 ### `Dũng (Edge)/` — Dũng
 
@@ -110,7 +132,6 @@ Xem **[Khánh (Web)/.../README.md](<Khánh (Web)/fall_detection_cloud/fall_detec
 
 ## Đọc thêm
 
-- `Tan Dung (AI)/README.md` — chi tiết 3 module AI, report, slide.
 - `Khánh (Web)/fall_detection_cloud/fall_detection_cloud/README.md` — cài đặt +
   toàn bộ REST API backend.
 - `Dũng (Edge)/docs/api_contract_v2.md`, `mqtt_schema_v2.json` — hợp đồng dữ liệu
